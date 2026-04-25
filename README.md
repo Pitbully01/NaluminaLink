@@ -40,7 +40,7 @@ cargo run -- list-nodes
 For runtime diagnostics:
 
 ```bash
-RUST_LOG=debug cargo run
+RUST_LOG=nalumina_link=debug cargo run
 ```
 
 ## Internationalization (i18n)

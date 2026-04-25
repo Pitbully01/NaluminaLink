@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
+use std::sync::Once;
 
 use log::{debug, error, info};
 use pipewire as pw;
@@ -8,17 +9,31 @@ use pipewire as pw;
 use crate::i18n::I18n;
 use crate::models::NodeEntry;
 
+static PIPEWIRE_INIT: Once = Once::new();
+
+fn ensure_pipewire_init() {
+    PIPEWIRE_INIT.call_once(|| {
+        debug!("node_discovery: process-wide pipewire init");
+        pw::init();
+    });
+}
+
 pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
-    debug!("node_discovery: initializing pipewire");
-    pw::init();
+    ensure_pipewire_init();
 
     let nodes = Rc::new(RefCell::new(Vec::new()));
 
     {
-        let main_loop = pw::main_loop::MainLoopRc::new(None)?;
-        let context = pw::context::ContextRc::new(&main_loop, None)?;
-        let core = context.connect_rc(None)?;
-        let registry = core.get_registry_rc()?;
+        let main_loop = pw::main_loop::MainLoopRc::new(None)
+            .map_err(|error| format!("pipewire main loop creation failed: {error}"))?;
+        let context = pw::context::ContextRc::new(&main_loop, None)
+            .map_err(|error| format!("pipewire context creation failed: {error}"))?;
+        let core = context
+            .connect_rc(None)
+            .map_err(|error| format!("pipewire core connection failed: {error}"))?;
+        let registry = core
+            .get_registry_rc()
+            .map_err(|error| format!("pipewire registry acquisition failed: {error}"))?;
 
         let main_loop_for_error = main_loop.clone();
         let _core_listener = core
@@ -26,10 +41,7 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
             .error(move |id, seq, res, message| {
                 error!(
                     "node_discovery: pipewire core error id={} seq={} res={} message={}",
-                    id,
-                    seq,
-                    res,
-                    message
+                    id, seq, res, message
                 );
                 eprintln!("PipeWire error id={id} seq={seq} res={res}: {message}");
                 main_loop_for_error.quit();
@@ -37,7 +49,9 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
             .register();
 
         let main_loop_for_done = main_loop.clone();
-        let sync_seq = core.sync(0)?;
+        let sync_seq = core
+            .sync(0)
+            .map_err(|error| format!("pipewire sync failed: {error}"))?;
         let nodes_for_global = nodes.clone();
 
         let _registry_listener = registry
@@ -74,11 +88,6 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
             .register();
 
         main_loop.run();
-    }
-
-    debug!("node_discovery: deinitializing pipewire");
-    unsafe {
-        pw::deinit();
     }
 
     let nodes = match Rc::try_unwrap(nodes) {

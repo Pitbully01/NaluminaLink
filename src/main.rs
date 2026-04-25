@@ -33,7 +33,7 @@ fn main() {
 }
 
 fn init_logging() {
-    let env = env_logger::Env::default().default_filter_or("info");
+    let env = env_logger::Env::default().default_filter_or("nalumina_link=info");
     let _ = env_logger::Builder::from_env(env).try_init();
 }
 
