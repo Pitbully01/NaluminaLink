@@ -1,13 +1,11 @@
 use std::error::Error;
 
-mod i18n;
-mod models;
-mod node_discovery;
-mod ui;
+mod features;
+mod shared;
 
-use i18n::I18n;
-use node_discovery::{collect_nodes, render_nodes};
-use ui::run_desktop_ui;
+use features::node_discovery::{collect_nodes, render_nodes};
+use features::ui::run_desktop_ui;
+use shared::i18n::I18n;
 
 fn main() {
     init_logging();

@@ -6,8 +6,9 @@ use std::sync::Once;
 use log::{debug, error, info};
 use pipewire as pw;
 
-use crate::i18n::I18n;
-use crate::models::NodeEntry;
+use crate::shared::i18n::I18n;
+
+use super::domain::NodeEntry;
 
 static PIPEWIRE_INIT: Once = Once::new();
 

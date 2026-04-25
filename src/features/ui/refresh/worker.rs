@@ -5,10 +5,10 @@ use log::{debug, error, info};
 
 use super::super::NaluminaApp;
 use super::{RefreshError, RefreshResult};
-use crate::node_discovery::collect_nodes;
+use crate::features::node_discovery::collect_nodes;
 
 impl NaluminaApp {
-    pub(in crate::ui) fn start_refresh(&mut self) {
+    pub(in crate::features::ui) fn start_refresh(&mut self) {
         if self.refresh_inflight.is_some() {
             return;
         }

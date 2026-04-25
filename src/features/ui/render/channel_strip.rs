@@ -2,7 +2,8 @@ use eframe::egui;
 
 use super::super::components::percent_progress_bar;
 use super::super::NaluminaApp;
-use crate::models::{ChannelStripState, NodeEntry};
+use crate::features::node_discovery::NodeEntry;
+use crate::features::ui::state::ChannelStripState;
 
 impl NaluminaApp {
     fn channel_label(name: &str) -> String {

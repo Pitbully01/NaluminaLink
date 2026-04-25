@@ -3,7 +3,8 @@ use log::info;
 
 use super::super::components::{percent_progress_bar, section_header};
 use super::super::NaluminaApp;
-use crate::models::{MixLevels, NodeEntry};
+use crate::features::node_discovery::NodeEntry;
+use crate::features::ui::state::MixLevels;
 
 const SCENE_PRESET_BALANCED: usize = 0;
 const SCENE_PRESET_MONITOR_FOCUS: usize = 1;
@@ -140,7 +141,7 @@ impl NaluminaApp {
             .collect()
     }
 
-    pub(in crate::ui) fn render_top_bar(&mut self, ctx: &egui::Context) {
+    pub(in crate::features::ui) fn render_top_bar(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
             egui::Frame::none()
                 .fill(egui::Color32::from_rgb(14, 20, 31))
@@ -170,7 +171,7 @@ impl NaluminaApp {
         });
     }
 
-    pub(in crate::ui) fn render_status_bar(&self, ctx: &egui::Context) {
+    pub(in crate::features::ui) fn render_status_bar(&self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("status_bar")
             .resizable(false)
             .show(ctx, |ui| {
@@ -304,7 +305,7 @@ impl NaluminaApp {
             });
     }
 
-    pub(in crate::ui) fn render_main_panel(&mut self, ctx: &egui::Context) {
+    pub(in crate::features::ui) fn render_main_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.render_workspace_controls(ui);
             ui.add_space(10.0);

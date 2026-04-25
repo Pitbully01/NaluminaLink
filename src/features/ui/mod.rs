@@ -2,8 +2,8 @@ use std::sync::mpsc::Receiver;
 
 use eframe::egui;
 
-use crate::i18n::I18n;
-use crate::models::NodeEntry;
+use crate::features::node_discovery::NodeEntry;
+use crate::shared::i18n::I18n;
 
 mod components;
 mod refresh;
@@ -12,7 +12,7 @@ mod state;
 mod theme;
 
 use refresh::RefreshResult;
-use state::{ChannelStateStore, UiStatus};
+use state::{ChannelStateStore, UiStatus, MAX_VISIBLE_CHANNELS};
 
 pub fn run_desktop_ui(i18n: &I18n) -> eframe::Result<()> {
     let options = eframe::NativeOptions {
@@ -49,7 +49,7 @@ impl NaluminaApp {
             refresh_inflight: None,
             channel_state: ChannelStateStore::new(),
             node_filter: String::new(),
-            visible_channel_limit: crate::models::MAX_VISIBLE_CHANNELS,
+            visible_channel_limit: MAX_VISIBLE_CHANNELS,
             selected_scene_preset: 0,
         };
 

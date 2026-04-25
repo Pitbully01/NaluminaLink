@@ -1,6 +1,6 @@
 use super::super::state::MixBus;
 use super::super::NaluminaApp;
-use crate::models::MixLevels;
+use crate::features::ui::state::MixLevels;
 
 impl NaluminaApp {
     fn calculate_mix_level(&self, bus: MixBus) -> f32 {

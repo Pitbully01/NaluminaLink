@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-const DEFAULT_EN: &str = include_str!("../lang/en.json");
-const DEFAULT_DE: &str = include_str!("../lang/de.json");
+const DEFAULT_EN: &str = include_str!("../../../lang/en.json");
+const DEFAULT_DE: &str = include_str!("../../../lang/de.json");
 
 #[derive(Clone, Debug)]
 pub struct I18n {

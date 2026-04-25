@@ -1,14 +1,41 @@
 use std::collections::BTreeMap;
 
-use crate::models::ChannelStripState;
+pub const DEFAULT_CHANNEL_LEVEL: f32 = 0.72;
+pub const DEFAULT_MONITOR_SEND: f32 = 1.0;
+pub const DEFAULT_STREAM_SEND: f32 = 0.82;
+pub const MAX_VISIBLE_CHANNELS: usize = 10;
 
 #[derive(Clone, Copy, Debug)]
-pub(in crate::ui) enum MixBus {
+pub struct ChannelStripState {
+    pub level: f32,
+    pub muted: bool,
+    pub send_monitor: f32,
+    pub send_stream: f32,
+}
+
+impl ChannelStripState {
+    pub fn meter_value(self) -> f32 {
+        if self.muted {
+            0.0
+        } else {
+            self.level
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct MixLevels {
+    pub monitor: f32,
+    pub stream: f32,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(in crate::features::ui) enum MixBus {
     Monitor,
     Stream,
 }
 
-pub(in crate::ui) struct ChannelStateStore {
+pub(in crate::features::ui) struct ChannelStateStore {
     channel_levels: BTreeMap<u32, f32>,
     channel_mute: BTreeMap<u32, bool>,
     channel_send_monitor: BTreeMap<u32, f32>,
@@ -16,7 +43,7 @@ pub(in crate::ui) struct ChannelStateStore {
 }
 
 impl ChannelStateStore {
-    pub(in crate::ui) fn new() -> Self {
+    pub(in crate::features::ui) fn new() -> Self {
         Self {
             channel_levels: BTreeMap::new(),
             channel_mute: BTreeMap::new(),
@@ -25,7 +52,11 @@ impl ChannelStateStore {
         }
     }
 
-    pub(in crate::ui) fn ensure_defaults(&mut self, node_id: u32, defaults: ChannelStripState) {
+    pub(in crate::features::ui) fn ensure_defaults(
+        &mut self,
+        node_id: u32,
+        defaults: ChannelStripState,
+    ) {
         self.channel_levels.entry(node_id).or_insert(defaults.level);
         self.channel_mute.entry(node_id).or_insert(defaults.muted);
         self.channel_send_monitor
@@ -36,7 +67,7 @@ impl ChannelStateStore {
             .or_insert(defaults.send_stream);
     }
 
-    pub(in crate::ui) fn load_or_default(
+    pub(in crate::features::ui) fn load_or_default(
         &mut self,
         node_id: u32,
         defaults: ChannelStripState,
@@ -57,7 +88,7 @@ impl ChannelStateStore {
         }
     }
 
-    pub(in crate::ui) fn store(&mut self, node_id: u32, state: ChannelStripState) {
+    pub(in crate::features::ui) fn store(&mut self, node_id: u32, state: ChannelStripState) {
         self.channel_levels.insert(node_id, state.level);
         self.channel_mute.insert(node_id, state.muted);
         self.channel_send_monitor
@@ -65,7 +96,7 @@ impl ChannelStateStore {
         self.channel_send_stream.insert(node_id, state.send_stream);
     }
 
-    pub(in crate::ui) fn effective_mix(&self, node_id: u32, bus: MixBus) -> f32 {
+    pub(in crate::features::ui) fn effective_mix(&self, node_id: u32, bus: MixBus) -> f32 {
         let level = *self.channel_levels.get(&node_id).unwrap_or(&0.0);
         let muted = *self.channel_mute.get(&node_id).unwrap_or(&false);
         let send = match bus {
@@ -83,8 +114,8 @@ impl ChannelStateStore {
 
 #[cfg(test)]
 mod tests {
+    use super::ChannelStripState;
     use super::{ChannelStateStore, MixBus};
-    use crate::models::ChannelStripState;
 
     fn defaults() -> ChannelStripState {
         ChannelStripState {

@@ -1,8 +1,8 @@
-use crate::i18n::I18n;
-use crate::ui::refresh::{RefreshError, RefreshErrorSource};
-use crate::ui::state::StatusKey;
+use crate::features::ui::refresh::{RefreshError, RefreshErrorSource};
+use crate::features::ui::state::StatusKey;
+use crate::shared::i18n::I18n;
 
-pub(in crate::ui) struct UiStatus {
+pub(in crate::features::ui) struct UiStatus {
     message: String,
 }
 
@@ -15,17 +15,17 @@ impl UiStatus {
         i18n.text_with(key.as_str(), placeholders)
     }
 
-    pub(in crate::ui) fn new(i18n: &I18n) -> Self {
+    pub(in crate::features::ui) fn new(i18n: &I18n) -> Self {
         Self {
             message: Self::resolve_text(i18n, StatusKey::Ready),
         }
     }
 
-    pub(in crate::ui) fn set_refreshing(&mut self, i18n: &I18n) {
+    pub(in crate::features::ui) fn set_refreshing(&mut self, i18n: &I18n) {
         self.message = Self::resolve_text(i18n, StatusKey::RefreshingNodes);
     }
 
-    pub(in crate::ui) fn set_loaded_nodes(&mut self, i18n: &I18n, count: usize) {
+    pub(in crate::features::ui) fn set_loaded_nodes(&mut self, i18n: &I18n, count: usize) {
         self.message = Self::resolve_text_with(
             i18n,
             StatusKey::LoadedNodes,
@@ -33,7 +33,7 @@ impl UiStatus {
         );
     }
 
-    pub(in crate::ui) fn set_refresh_failed(&mut self, i18n: &I18n, error: RefreshError) {
+    pub(in crate::features::ui) fn set_refresh_failed(&mut self, i18n: &I18n, error: RefreshError) {
         let source_label = match error.source {
             RefreshErrorSource::NodeDiscovery => {
                 Self::resolve_text(i18n, StatusKey::RefreshErrorSourceNodeDiscovery)
@@ -45,20 +45,20 @@ impl UiStatus {
             Self::resolve_text_with(i18n, StatusKey::RefreshFailed, &[("error", display)]);
     }
 
-    pub(in crate::ui) fn set_refresh_disconnected(&mut self, i18n: &I18n) {
+    pub(in crate::features::ui) fn set_refresh_disconnected(&mut self, i18n: &I18n) {
         self.message = Self::resolve_text(i18n, StatusKey::RefreshDisconnected);
     }
 
-    pub(in crate::ui) fn set_scene_applied(&mut self, i18n: &I18n, preset: String) {
+    pub(in crate::features::ui) fn set_scene_applied(&mut self, i18n: &I18n, preset: String) {
         self.message =
             Self::resolve_text_with(i18n, StatusKey::SceneApplied, &[("preset", preset)]);
     }
 
-    pub(in crate::ui) fn set_doctor_message(&mut self, i18n: &I18n) {
+    pub(in crate::features::ui) fn set_doctor_message(&mut self, i18n: &I18n) {
         self.message = Self::resolve_text(i18n, StatusKey::DoctorMessage);
     }
 
-    pub(in crate::ui) fn text(&self) -> &str {
+    pub(in crate::features::ui) fn text(&self) -> &str {
         &self.message
     }
 }
@@ -66,8 +66,8 @@ impl UiStatus {
 #[cfg(test)]
 mod tests {
     use super::UiStatus;
-    use crate::i18n::I18n;
-    use crate::ui::refresh::RefreshError;
+    use crate::features::ui::refresh::RefreshError;
+    use crate::shared::i18n::I18n;
 
     fn i18n_en() -> I18n {
         std::env::set_var("NALUMINALINK_LANG", "en");

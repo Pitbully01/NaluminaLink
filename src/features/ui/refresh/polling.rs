@@ -4,7 +4,7 @@ use log::{debug, error, info};
 
 use super::super::NaluminaApp;
 use super::{RefreshError, RefreshResult};
-use crate::models::NodeEntry;
+use crate::features::node_discovery::NodeEntry;
 
 impl NaluminaApp {
     fn on_refresh_success(&mut self, nodes: Vec<NodeEntry>) {
@@ -28,7 +28,7 @@ impl NaluminaApp {
         self.status.set_refresh_disconnected(&self.i18n);
     }
 
-    pub(in crate::ui) fn poll_refresh(&mut self) {
+    pub(in crate::features::ui) fn poll_refresh(&mut self) {
         let Some(receiver) = self.refresh_inflight.take() else {
             return;
         };

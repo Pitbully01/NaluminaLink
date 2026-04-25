@@ -1,4 +1,4 @@
-pub(in crate::ui) enum StatusKey {
+pub(in crate::features::ui) enum StatusKey {
     Ready,
     RefreshingNodes,
     LoadedNodes,
@@ -10,7 +10,7 @@ pub(in crate::ui) enum StatusKey {
 }
 
 impl StatusKey {
-    pub(in crate::ui) fn as_str(&self) -> &'static str {
+    pub(in crate::features::ui) fn as_str(&self) -> &'static str {
         match self {
             StatusKey::Ready => "status.ready",
             StatusKey::RefreshingNodes => "status.refreshing_nodes",

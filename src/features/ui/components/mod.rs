@@ -1,11 +1,11 @@
 use eframe::egui;
 
-pub(in crate::ui) fn section_header(ui: &mut egui::Ui, title: String, subtitle: String) {
+pub(in crate::features::ui) fn section_header(ui: &mut egui::Ui, title: String, subtitle: String) {
     ui.heading(title);
     ui.label(subtitle);
 }
 
-pub(in crate::ui) fn percent_progress_bar(
+pub(in crate::features::ui) fn percent_progress_bar(
     ui: &mut egui::Ui,
     value: f32,
     width: f32,
