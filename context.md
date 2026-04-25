@@ -1,103 +1,110 @@
-# Projekt: PipeWire Audio Router (Rust)
+# Project: PipeWire Audio Router (Rust)
 
-## 🧠 Ziel des Projekts
+## Project Goal
 
-Dieses Projekt implementiert einen **modularen Audio-Router für Linux (primär Arch Linux)** auf Basis von PipeWire.
+This project builds a **modular audio router for Linux (primarily Arch Linux)** on top of PipeWire.
 
-Der Fokus liegt auf:
+Primary focus areas:
 
-- dynamischem Audio-Routing
-- virtuellen Audio-Channels
-- Plugin-Processing (DSP Chains)
-- CLI-basierter Steuerung (kein GUI)
+- dynamic audio routing
+- virtual audio channels
+- plugin processing (DSP chains)
+- GUI-driven control, with CLI support for diagnostics and automation
 
-Das Projekt ist **kein klassischer Mixer**, sondern eher:
+This is **not** intended to be a classic mixer. Conceptually, it is closer to:
 
-> ein linux port von elgato wave link 3
-
----
-
-## 🎯 Kernfeatures (geplant)
-
-- [ ] Virtuelle Audio-Channels erstellen/löschen
-- [ ] Audioquellen (Apps, Devices) Channels zuweisen
-- [ ] Channels miteinander verbinden
-- [ ] DSP-Ketten pro Channel (Plugins)
-- [ ] Persistente Routing-Konfiguration
-- [ ] CLI Interface für Steuerung
+> a Linux implementation inspired by Elgato Wave Link / Banana-style workflows
 
 ---
 
-## ❌ Nicht-Ziele (bewusst ausgeschlossen)
+## Planned Core Features
 
-- Kein GUI (auch langfristig nicht geplant)
-- Keine DAW-Funktionalität (kein Recording, kein Timeline Editing)
-- Kein vollständiger Ersatz für professionelle Audio-Workstations
-- Kein Fokus auf Cross-Platform (Linux-only)
+- [ ] Create/remove virtual audio channels
+- [ ] Assign application/device sources to channels
+- [ ] Connect channels to each other and to outputs
+- [ ] DSP chains per channel
+- [ ] Persistent routing configuration
+- [ ] GUI for control and monitoring
+- [ ] CLI for debug and automation
+- [x] Early desktop test UI
 
 ---
 
-## 🧱 Architektur-Übersicht
+## Explicit Non-Goals
 
-Das System ist in drei Hauptschichten unterteilt:
+- Terminal-only final product
+- DAW functionality (recording, timeline editing)
+- Full replacement for professional audio workstations
+- Cross-platform-first scope (Linux only)
+
+Notes:
+
+- A GUI is the target; the current desktop UI is an early test surface.
+- The long-term interaction model should feel similar to Wave Link / Banana routing UX.
+
+---
+
+## Architecture Overview
+
+The system is organized into three major layers:
 
 ### 1. Audio Layer (PipeWire Integration)
 
-Verantwortlich für:
+Responsible for:
 
-- Verbindung zu PipeWire
-- Erstellen von Nodes (Streams / Filter)
-- Port-Handling und Linking
+- connecting to PipeWire
+- creating/managing nodes (streams, filters)
+- port handling and linking
 
-Technologien:
+Tech:
 
 - Rust `pipewire` crate
-- PipeWire Filter Nodes (`pw_filter`)
+- PipeWire filter/node APIs
 
 ---
 
 ### 2. DSP / Plugin Layer
 
-Verantwortlich für:
+Responsible for:
 
-- Audioverarbeitung innerhalb eines Channels
-- Plugin-Hosting
+- per-channel audio processing
+- plugin hosting
 
-Geplante Unterstützung:
+Planned support:
 
-- Primär: LV2 (Linux-native Plugins)
-- Optional später: VST3 über VST3 SDK
+- primary: LV2 (Linux-native)
+- optional later: VST3
 
-Wichtige Einschränkungen:
+Key constraints:
 
-- Realtime-safe Verarbeitung erforderlich
-- Keine dynamische Speicherallokation im Audio-Thread
-- Plugins laufen im Audio-Thread
+- realtime-safe processing is mandatory
+- no heap allocation in the audio thread
+- plugins run in or near realtime-sensitive paths
 
 ---
 
 ### 3. Routing Engine (Core Logic)
 
-Verantwortlich für:
+Responsible for:
 
-- Verwaltung von Channels
-- Verbindungen zwischen Nodes
-- Plugin-Ketten
-- Zustand des Systems
+- channel lifecycle and state
+- graph/routing relationships between nodes
+- plugin chain assignment
+- system state updates and propagation
 
-Dies ist die **zentrale Logik des Projekts**.
+This is the **central project logic**.
 
 ---
 
-## 🔁 Konzept: Channel
+## Channel Concept
 
-Ein Channel ist die zentrale Einheit:
+Each channel is modeled as:
 
 ```
 Input → DSP Chain → Output
 ```
 
-Rust-Struktur (konzeptionell):
+Conceptual Rust model:
 
 ```rust
 struct Channel {
@@ -110,13 +117,13 @@ struct Channel {
 
 ---
 
-## 🔌 Konzept: DSP Chain
+## DSP Chain Concept
 
-- Reihenfolge ist entscheidend
-- Jeder Plugin-Prozess erhält Audio-Buffer
-- Verarbeitung erfolgt sample-weise oder blockweise
+- processing order matters
+- each plugin receives and transforms audio buffers
+- processing can be sample-based or block-based
 
-Beispiel:
+Example:
 
 ```
 Input → Gain → EQ → Reverb → Output
@@ -124,60 +131,56 @@ Input → Gain → EQ → Reverb → Output
 
 ---
 
-## ⚙️ CLI Interface
+## UI/CLI Status
 
-Das System wird ausschließlich über CLI gesteuert.
+The system is not CLI-only.
 
-Beispielbefehle:
+Current status:
 
-```bash
-mixer add-channel music
-mixer add-plugin music reverb
-mixer connect firefox music
-mixer connect music output
-mixer remove-channel music
-```
+- `cargo run` starts the desktop test UI
+- `cargo run -- list-nodes` lists PipeWire nodes in CLI
+- `cargo run -- doctor` prints a basic health/status message
+- CLI remains a debug and automation companion
 
 ---
 
-## 🧵 Concurrency & Realtime Constraints
+## Concurrency & Realtime Constraints
 
-WICHTIG:
+Critical rules:
 
-- Audio-Thread darf:
-    - ❌ nicht blockieren
-    - ❌ keine Mutex Locks verwenden
-    - ❌ keine Heap-Allokationen durchführen
+- Audio thread must:
+    - never block
+    - avoid mutex locking
+    - avoid heap allocations
 
-- Kommunikation erfolgt über:
-    - Lock-free Queues
-    - Message Passing
-    - Double-buffered State
+- State/control communication should use:
+    - lock-free queues or message passing
+    - immutable snapshots or double-buffered state transitions
 
 ---
 
-## 🧠 State Management
+## State Management
 
-Zwei getrennte Zustände:
+Two distinct states:
 
-1. **Control State (CLI / Main Thread)**
+1. **Control State (GUI/CLI/Main Thread)**
 2. **Audio State (Realtime Thread)**
 
-Synchronisation über:
+Synchronization approach:
 
-- Event Queue
-- Immutable Snapshots
+- event queues
+- immutable snapshots
 
 ---
 
-## 📦 Persistenz
+## Persistence
 
-Geplant:
+Planned:
 
-- Speicherung als JSON oder TOML
-- Wiederherstellung beim Start
+- JSON or TOML configuration
+- restore routing/session state on startup
 
-Beispiel:
+Example:
 
 ```json
 {
@@ -192,82 +195,96 @@ Beispiel:
 
 ---
 
-## 🧪 Entwicklungsstrategie
+## Development Strategy
 
 ### Phase 1
 
-- Verbindung zu PipeWire herstellen
-- Nodes auflisten
+- connect to PipeWire
+- enumerate nodes
+
+Status: implemented as the first working baseline.
 
 ### Phase 2
 
-- Einfacher Pass-through Filter Node
+- simple pass-through filter node
+
+Next practical step: expand the GUI structure into channel view, routing controls, and monitoring workflow.
 
 ### Phase 3
 
-- Gain (Volume Control)
+- gain/volume control
 
 ### Phase 4
 
-- Mehrere Channels
+- multiple channels
 
 ### Phase 5
 
-- Routing zwischen Channels
+- inter-channel routing
 
 ### Phase 6
 
-- Plugin-System (LV2)
+- LV2 plugin system
 
 ### Phase 7
 
-- Optional: VST3 Support
+- optional VST3 support
 
 ---
 
-## ⚠️ Wichtige Designentscheidungen
+## Key Design Decisions
 
-- Rust wird für Sicherheit und Concurrency verwendet
-- PipeWire ist die einzige Audio-Backend-Abhängigkeit
-- CLI-first Design (kein GUI-Overhead)
-- Modularität ist wichtiger als Performance in frühen Phasen
-- Realtime-Sicherheit hat oberste Priorität
+- Rust for safety and concurrency correctness
+- PipeWire as the single audio backend dependency
+- user-facing text managed through language files (i18n), not hardcoded strings
+- GUI-centered product direction, with CLI for diagnostics/automation
+- prefer modularity and clarity in early phases
+- realtime safety is non-negotiable
 
----
+### i18n Model (Current)
 
-## 🚫 Dinge, die vermieden werden sollen
-
-- „quick hacks“ im Audio-Thread
-- globale mutable States
-- blocking IO im Audiopfad
-- enge Kopplung zwischen Routing und DSP
-
----
-
-## 🔮 Zukunft (optional)
-
-- Preset-System für Routing
-- Netzwerk-Audio (z. B. RTP)
-- Web-Interface (nur Control, nicht Rendering)
-- Plugin Sandbox (separater Prozess)
+- language files in `lang/` (`en.json`, `de.json`)
+- UI/CLI text is resolved via keys
+- dynamic values use placeholders (`{{name}}`)
+- language detection via `NALUMINALINK_LANG`, fallback via `LANG`
 
 ---
 
-## 🧭 Für KI / Coding Agents
+## Things To Avoid
 
-Beim Arbeiten an diesem Projekt:
-
-- Bevorzuge **einfache, nachvollziehbare Lösungen**
-- Halte dich strikt an Realtime-Constraints
-- Verändere Architektur nur mit Begründung
-- Vermeide unnötige Abstraktion
-- Schreibe Code, der debugbar ist (Logging außerhalb Audio-Thread)
-
-Wenn unsicher:
-→ lieber minimal implementieren als overengineeren
+- quick hacks in audio-thread code paths
+- global mutable state without strict ownership boundaries
+- blocking IO in audio path
+- tight coupling between routing and DSP concerns
 
 ---
 
-## 📌 Aktueller Fokus
+## Optional Future Scope
 
-> Minimal funktionierender Audio-Pass-Through über PipeWire Filter Node
+- routing presets/scenes
+- network audio support (e.g. RTP)
+- web control surface (control only, no rendering)
+- plugin sandboxing (separate process)
+- full channel-based GUI for routing, monitoring, and DSP management
+
+---
+
+## Notes For Coding Agents
+
+When working on this project:
+
+- prefer simple and traceable solutions
+- follow realtime constraints strictly
+- change architecture only with explicit rationale
+- avoid unnecessary abstraction
+- keep code debuggable (logging outside realtime audio thread)
+
+If uncertain:
+
+-> choose the smallest viable implementation over overengineering
+
+---
+
+## Current Focus
+
+> A minimal working baseline with PipeWire node discovery, desktop test UI, i18n-backed user text, and foundations for a full routing GUI
