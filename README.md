@@ -37,6 +37,12 @@ cargo check
 cargo run -- list-nodes
 ```
 
+For runtime diagnostics:
+
+```bash
+RUST_LOG=debug cargo run
+```
+
 ## Internationalization (i18n)
 
 - All user-facing strings are resolved by translation keys, not hardcoded literals in main application flow.

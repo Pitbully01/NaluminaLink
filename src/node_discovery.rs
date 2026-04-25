@@ -2,12 +2,14 @@ use std::cell::RefCell;
 use std::error::Error;
 use std::rc::Rc;
 
+use log::{debug, error, info};
 use pipewire as pw;
 
 use crate::i18n::I18n;
 use crate::models::NodeEntry;
 
 pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
+    debug!("node_discovery: initializing pipewire");
     pw::init();
 
     let nodes = Rc::new(RefCell::new(Vec::new()));
@@ -22,6 +24,13 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
         let _core_listener = core
             .add_listener_local()
             .error(move |id, seq, res, message| {
+                error!(
+                    "node_discovery: pipewire core error id={} seq={} res={} message={}",
+                    id,
+                    seq,
+                    res,
+                    message
+                );
                 eprintln!("PipeWire error id={id} seq={seq} res={res}: {message}");
                 main_loop_for_error.quit();
             })
@@ -67,6 +76,7 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
         main_loop.run();
     }
 
+    debug!("node_discovery: deinitializing pipewire");
     unsafe {
         pw::deinit();
     }
@@ -75,6 +85,8 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
         Ok(nodes) => nodes.into_inner(),
         Err(_) => return Err("failed to unwrap collected nodes".into()),
     };
+
+    info!("node_discovery: collected {} nodes", nodes.len());
 
     Ok(nodes)
 }

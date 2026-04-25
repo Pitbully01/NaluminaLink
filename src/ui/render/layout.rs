@@ -1,4 +1,5 @@
 use eframe::egui;
+use log::info;
 
 use super::super::components::{percent_progress_bar, section_header};
 use super::super::NaluminaApp;
@@ -19,7 +20,7 @@ impl NaluminaApp {
     }
 
     fn apply_scene_preset(&mut self, preset: usize) {
-        let node_ids: Vec<u32> = self.nodes.iter().map(|node| node.id).collect();
+        let node_ids: Vec<u32> = self.visible_nodes().iter().map(|node| node.id).collect();
         for node_id in node_ids {
             let mut state = self
                 .channel_state
@@ -46,6 +47,11 @@ impl NaluminaApp {
         self.selected_scene_preset = preset;
         let preset_name = self.scene_preset_name(preset);
         self.status.set_scene_applied(&self.i18n, preset_name);
+        info!(
+            "scene: applied preset {} to {} visible channels",
+            preset,
+            self.visible_nodes().len()
+        );
     }
 
     fn render_scene_preset_buttons(&mut self, ui: &mut egui::Ui) {

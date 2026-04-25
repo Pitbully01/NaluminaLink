@@ -10,6 +10,8 @@ use node_discovery::{collect_nodes, render_nodes};
 use ui::run_desktop_ui;
 
 fn main() {
+    init_logging();
+
     let args: Vec<String> = std::env::args().collect();
     let i18n = I18n::load();
 
@@ -28,6 +30,11 @@ fn main() {
             std::process::exit(1);
         }
     }
+}
+
+fn init_logging() {
+    let env = env_logger::Env::default().default_filter_or("info");
+    let _ = env_logger::Builder::from_env(env).try_init();
 }
 
 fn run_ui_or_exit(i18n: &I18n) {
