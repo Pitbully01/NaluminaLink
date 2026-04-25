@@ -1,7 +1,7 @@
 use eframe::egui;
 
-use super::super::NaluminaApp;
 use super::super::components::{percent_progress_bar, section_header};
+use super::super::NaluminaApp;
 use crate::models::{MixLevels, NodeEntry, MAX_VISIBLE_CHANNELS};
 
 impl NaluminaApp {

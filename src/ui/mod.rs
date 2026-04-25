@@ -11,6 +11,7 @@ mod render;
 mod state;
 mod theme;
 
+use refresh::RefreshResult;
 use state::{ChannelStateStore, UiStatus};
 
 pub fn run_desktop_ui(i18n: &I18n) -> eframe::Result<()> {
@@ -32,7 +33,7 @@ pub struct NaluminaApp {
     i18n: I18n,
     nodes: Vec<NodeEntry>,
     status: UiStatus,
-    refresh_inflight: Option<Receiver<Result<Vec<NodeEntry>, String>>>,
+    refresh_inflight: Option<Receiver<RefreshResult>>,
     channel_state: ChannelStateStore,
 }
 

@@ -1,6 +1,7 @@
 use std::sync::mpsc;
 
 use super::super::NaluminaApp;
+use super::RefreshResult;
 use crate::models::NodeEntry;
 
 impl NaluminaApp {
@@ -14,7 +15,7 @@ impl NaluminaApp {
         self.status.set_refresh_failed(&self.i18n, error);
     }
 
-    fn on_refresh_pending(&mut self, receiver: mpsc::Receiver<Result<Vec<NodeEntry>, String>>) {
+    fn on_refresh_pending(&mut self, receiver: mpsc::Receiver<RefreshResult>) {
         self.refresh_inflight = Some(receiver);
     }
 
@@ -28,8 +29,8 @@ impl NaluminaApp {
         };
 
         match receiver.try_recv() {
-            Ok(Ok(nodes)) => self.on_refresh_success(nodes),
-            Ok(Err(error)) => self.on_refresh_error(error),
+            Ok(RefreshResult::Loaded(nodes)) => self.on_refresh_success(nodes),
+            Ok(RefreshResult::Failed(error)) => self.on_refresh_error(error),
             Err(mpsc::TryRecvError::Empty) => self.on_refresh_pending(receiver),
             Err(mpsc::TryRecvError::Disconnected) => self.on_refresh_disconnected(),
         }
