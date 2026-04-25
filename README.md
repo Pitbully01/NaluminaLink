@@ -7,6 +7,7 @@ A modular Linux audio router built on PipeWire, with a GUI-first direction inspi
 The project is currently in an early implementation phase. Right now it includes:
 
 - a desktop test UI for browsing PipeWire nodes and testing mixer-style layout ideas
+- per-channel dual-mix sends (independent monitor and stream levels) in the desktop UI
 - a CLI command for listing discovered nodes
 - a simple `doctor` command for basic health output
 - language-file based i18n for visible CLI and UI text
@@ -65,7 +66,23 @@ cargo run -- list-nodes
 
 ## Project Structure
 
-- `src/main.rs` - app entrypoint, CLI commands, desktop UI, and PipeWire node discovery view
+- `src/main.rs` - app entrypoint and CLI command orchestration
+- `src/ui/mod.rs` - desktop UI bootstrap and `NaluminaApp` root state
+- `src/ui/components.rs` - shared UI helper components (section headers and progress bars)
+- `src/ui/state/mod.rs` - UI state module wiring
+- `src/ui/state/channel_state.rs` - centralized channel state store for levels, mute, and sends
+- `src/ui/state/status_state.rs` - centralized UI status message state and transitions
+- `src/ui/render/mod.rs` - render module wiring
+- `src/ui/render/layout.rs` - panel layout and main composition
+- `src/ui/render/channel_strip.rs` - channel strip state and controls
+- `src/ui/render/mix.rs` - monitor/stream mix calculations
+- `src/ui/refresh/mod.rs` - refresh module wiring
+- `src/ui/refresh/worker.rs` - node refresh worker start logic
+- `src/ui/refresh/polling.rs` - non-blocking refresh polling and status handling
+- `src/ui/refresh/defaults.rs` - node default channel state synchronization
+- `src/ui/theme.rs` - UI theme setup
+- `src/node_discovery.rs` - PipeWire node collection and CLI node rendering
+- `src/models.rs` - shared app models and UI constants
 - `src/i18n.rs` - language loading and placeholder interpolation
 - `lang/en.json` - English translation strings
 - `lang/de.json` - German translation strings
