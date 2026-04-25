@@ -41,6 +41,7 @@ cargo run -- list-nodes
 - Language files are located in `lang/` (`en.json`, `de.json`).
 - Placeholders use the `{{name}}` format and are replaced at runtime.
 - Language is detected from `NALUMINALINK_LANG` first, then `LANG`, with fallback to English.
+- Technical error sources in UI status messages are also localized via i18n keys.
 
 ## Target Product
 

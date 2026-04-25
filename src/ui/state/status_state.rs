@@ -21,10 +21,12 @@ impl UiStatus {
     }
 
     pub(in crate::ui) fn set_refresh_failed(&mut self, i18n: &I18n, error: RefreshError) {
-        let source = match error.source {
-            RefreshErrorSource::NodeDiscovery => "node_discovery",
+        let source_label = match error.source {
+            RefreshErrorSource::NodeDiscovery => {
+                i18n.text("status.refresh_error_source.node_discovery")
+            }
         };
-        let display = format!("[{source}] {}", error.message);
+        let display = format!("{source_label}: {}", error.message);
 
         self.message = i18n.text_with("status.refresh_failed", &[("error", display)]);
     }

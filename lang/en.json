@@ -16,6 +16,7 @@
   "status.refreshing_nodes": "Refreshing PipeWire nodes...",
   "status.loaded_nodes": "Loaded {{count}} PipeWire nodes.",
   "status.refresh_failed": "Refresh failed: {{error}}",
+  "status.refresh_error_source.node_discovery": "Node discovery",
   "status.refresh_disconnected": "Refresh worker disconnected.",
   "ui.tagline": "Wave-Link inspired routing surface",
   "ui.button.refresh_nodes": "Refresh nodes",

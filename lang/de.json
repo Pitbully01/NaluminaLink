@@ -16,6 +16,7 @@
   "status.refreshing_nodes": "PipeWire-Nodes werden aktualisiert...",
   "status.loaded_nodes": "{{count}} PipeWire-Nodes geladen.",
   "status.refresh_failed": "Aktualisierung fehlgeschlagen: {{error}}",
+  "status.refresh_error_source.node_discovery": "Node-Erkennung",
   "status.refresh_disconnected": "Refresh-Worker getrennt.",
   "ui.tagline": "Routing-Oberfläche im Wave-Link-Stil",
   "ui.button.refresh_nodes": "Nodes aktualisieren",
