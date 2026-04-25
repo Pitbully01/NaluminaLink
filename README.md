@@ -72,6 +72,7 @@ cargo run -- list-nodes
 - `src/ui/components.rs` - shared UI helper components (section headers and progress bars)
 - `src/ui/state/mod.rs` - UI state module wiring
 - `src/ui/state/channel_state.rs` - centralized channel state store for levels, mute, and sends
+- `src/ui/state/status_keys.rs` - typed i18n key enum for UI status messages
 - `src/ui/state/status_state.rs` - centralized UI status message state and transitions
 - `src/ui/render/mod.rs` - render module wiring
 - `src/ui/render/layout.rs` - panel layout and main composition
