@@ -1,4 +1,5 @@
 use crate::i18n::I18n;
+use crate::ui::refresh::{RefreshError, RefreshErrorSource};
 
 pub(in crate::ui) struct UiStatus {
     message: String,
@@ -19,8 +20,13 @@ impl UiStatus {
         self.message = i18n.text_with("status.loaded_nodes", &[("count", count.to_string())]);
     }
 
-    pub(in crate::ui) fn set_refresh_failed(&mut self, i18n: &I18n, error: String) {
-        self.message = i18n.text_with("status.refresh_failed", &[("error", error)]);
+    pub(in crate::ui) fn set_refresh_failed(&mut self, i18n: &I18n, error: RefreshError) {
+        let source = match error.source {
+            RefreshErrorSource::NodeDiscovery => "node_discovery",
+        };
+        let display = format!("[{source}] {}", error.message);
+
+        self.message = i18n.text_with("status.refresh_failed", &[("error", display)]);
     }
 
     pub(in crate::ui) fn set_refresh_disconnected(&mut self, i18n: &I18n) {

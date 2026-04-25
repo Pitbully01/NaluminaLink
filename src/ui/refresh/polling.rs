@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 
 use super::super::NaluminaApp;
-use super::RefreshResult;
+use super::{RefreshError, RefreshResult};
 use crate::models::NodeEntry;
 
 impl NaluminaApp {
@@ -11,7 +11,7 @@ impl NaluminaApp {
         self.sync_node_defaults();
     }
 
-    fn on_refresh_error(&mut self, error: String) {
+    fn on_refresh_error(&mut self, error: RefreshError) {
         self.status.set_refresh_failed(&self.i18n, error);
     }
 

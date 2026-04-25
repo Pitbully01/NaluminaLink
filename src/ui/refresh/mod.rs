@@ -3,4 +3,4 @@ mod polling;
 mod result;
 mod worker;
 
-pub(in crate::ui) use result::RefreshResult;
+pub(in crate::ui) use result::{RefreshError, RefreshErrorSource, RefreshResult};

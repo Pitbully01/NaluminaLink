@@ -79,7 +79,7 @@ cargo run -- list-nodes
 - `src/ui/refresh/mod.rs` - refresh module wiring
 - `src/ui/refresh/worker.rs` - node refresh worker start logic
 - `src/ui/refresh/polling.rs` - non-blocking refresh polling and status handling
-- `src/ui/refresh/result.rs` - typed refresh result object for worker-to-UI communication
+- `src/ui/refresh/result.rs` - typed refresh result/error objects (including error source metadata)
 - `src/ui/refresh/defaults.rs` - node default channel state synchronization
 - `src/ui/theme.rs` - UI theme setup
 - `src/node_discovery.rs` - PipeWire node collection and CLI node rendering

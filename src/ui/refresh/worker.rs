@@ -2,7 +2,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use super::super::NaluminaApp;
-use super::RefreshResult;
+use super::{RefreshError, RefreshResult};
 use crate::node_discovery::collect_nodes;
 
 impl NaluminaApp {
@@ -18,7 +18,9 @@ impl NaluminaApp {
         thread::spawn(move || {
             let result = match collect_nodes() {
                 Ok(nodes) => RefreshResult::Loaded(nodes),
-                Err(error) => RefreshResult::Failed(error.to_string()),
+                Err(error) => {
+                    RefreshResult::Failed(RefreshError::node_discovery(error.to_string()))
+                }
             };
             let _ = sender.send(result);
         });
