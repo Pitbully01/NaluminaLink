@@ -49,6 +49,11 @@ impl UiStatus {
         self.message = Self::resolve_text(i18n, StatusKey::RefreshDisconnected);
     }
 
+    pub(in crate::ui) fn set_scene_applied(&mut self, i18n: &I18n, preset: String) {
+        self.message =
+            Self::resolve_text_with(i18n, StatusKey::SceneApplied, &[("preset", preset)]);
+    }
+
     pub(in crate::ui) fn set_doctor_message(&mut self, i18n: &I18n) {
         self.message = Self::resolve_text(i18n, StatusKey::DoctorMessage);
     }

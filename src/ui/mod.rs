@@ -35,6 +35,9 @@ pub struct NaluminaApp {
     status: UiStatus,
     refresh_inflight: Option<Receiver<RefreshResult>>,
     channel_state: ChannelStateStore,
+    node_filter: String,
+    visible_channel_limit: usize,
+    selected_scene_preset: usize,
 }
 
 impl NaluminaApp {
@@ -45,6 +48,9 @@ impl NaluminaApp {
             nodes: Vec::new(),
             refresh_inflight: None,
             channel_state: ChannelStateStore::new(),
+            node_filter: String::new(),
+            visible_channel_limit: crate::models::MAX_VISIBLE_CHANNELS,
+            selected_scene_preset: 0,
         };
 
         app.start_refresh();

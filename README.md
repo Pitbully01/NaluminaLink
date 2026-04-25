@@ -8,6 +8,8 @@ The project is currently in an early implementation phase. Right now it includes
 
 - a desktop test UI for browsing PipeWire nodes and testing mixer-style layout ideas
 - per-channel dual-mix sends (independent monitor and stream levels) in the desktop UI
+- workspace controls for node filtering and adjustable channel visibility
+- scene preset buttons (Balanced / Monitor Focus / Stream Boost) for fast mix shaping
 - a CLI command for listing discovered nodes
 - a simple `doctor` command for basic health output
 - language-file based i18n for visible CLI and UI text

@@ -4,6 +4,7 @@ pub(in crate::ui) enum StatusKey {
     LoadedNodes,
     RefreshFailed,
     RefreshDisconnected,
+    SceneApplied,
     DoctorMessage,
     RefreshErrorSourceNodeDiscovery,
 }
@@ -16,6 +17,7 @@ impl StatusKey {
             StatusKey::LoadedNodes => "status.loaded_nodes",
             StatusKey::RefreshFailed => "status.refresh_failed",
             StatusKey::RefreshDisconnected => "status.refresh_disconnected",
+            StatusKey::SceneApplied => "status.scene_applied",
             StatusKey::DoctorMessage => "doctor.message",
             StatusKey::RefreshErrorSourceNodeDiscovery => {
                 "status.refresh_error_source.node_discovery"
