@@ -12,7 +12,7 @@ mod state;
 mod theme;
 
 use refresh::RefreshResult;
-use state::{ChannelStateStore, UiStatus, MAX_VISIBLE_CHANNELS};
+use state::{ChannelStateStore, UiStatus, DEFAULT_MIX_BUS_COUNT, MAX_VISIBLE_CHANNELS};
 
 pub fn run_desktop_ui(i18n: &I18n) -> eframe::Result<()> {
     let options = eframe::NativeOptions {
@@ -37,6 +37,7 @@ pub struct NaluminaApp {
     channel_state: ChannelStateStore,
     node_filter: String,
     visible_channel_limit: usize,
+    mix_bus_count: usize,
     selected_scene_preset: usize,
 }
 
@@ -50,6 +51,7 @@ impl NaluminaApp {
             channel_state: ChannelStateStore::new(),
             node_filter: String::new(),
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
+            mix_bus_count: DEFAULT_MIX_BUS_COUNT,
             selected_scene_preset: 0,
         };
 

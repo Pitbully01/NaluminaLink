@@ -18,7 +18,7 @@ impl NaluminaApp {
 
     fn load_channel_state(&mut self, node_id: u32) -> ChannelStripState {
         self.channel_state
-            .load_or_default(node_id, Self::default_channel_state())
+            .load_or_default(node_id, Self::default_channel_state(self.mix_bus_count))
     }
 
     fn store_channel_state(&mut self, node_id: u32, state: ChannelStripState) {
@@ -45,21 +45,15 @@ impl NaluminaApp {
         }
 
         ui.add_space(6.0);
-        ui.label(egui::RichText::new(self.i18n.text("ui.channel.monitor_send")).small());
-        ui.add_sized(
-            [60.0, 16.0],
-            egui::Slider::new(&mut state.send_monitor, 0.0..=1.0)
-                .show_value(false)
-                .trailing_fill(true),
-        );
-
-        ui.label(egui::RichText::new(self.i18n.text("ui.channel.stream_send")).small());
-        ui.add_sized(
-            [60.0, 16.0],
-            egui::Slider::new(&mut state.send_stream, 0.0..=1.0)
-                .show_value(false)
-                .trailing_fill(true),
-        );
+        for (bus_index, send) in state.sends.iter_mut().enumerate() {
+            ui.label(egui::RichText::new(self.mix_bus_label(bus_index)).small());
+            ui.add_sized(
+                [60.0, 16.0],
+                egui::Slider::new(send, 0.0..=1.0)
+                    .show_value(false)
+                    .trailing_fill(true),
+            );
+        }
     }
 
     pub(super) fn draw_channel_strip(&mut self, ui: &mut egui::Ui, node: &NodeEntry) {

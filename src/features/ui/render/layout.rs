@@ -4,7 +4,7 @@ use log::info;
 use super::super::components::{percent_progress_bar, section_header};
 use super::super::NaluminaApp;
 use crate::features::node_discovery::NodeEntry;
-use crate::features::ui::state::MixLevels;
+use crate::features::ui::state::{MixLevels, MAX_MIX_BUS_COUNT};
 
 const SCENE_PRESET_BALANCED: usize = 0;
 const SCENE_PRESET_MONITOR_FOCUS: usize = 1;
@@ -12,6 +12,16 @@ const SCENE_PRESET_STREAM_BOOST: usize = 2;
 const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 
 impl NaluminaApp {
+    pub(super) fn mix_bus_label(&self, bus_index: usize) -> String {
+        match bus_index {
+            0 => self.i18n.text("ui.channel.monitor_send"),
+            1 => self.i18n.text("ui.channel.stream_send"),
+            2 => self.i18n.text("ui.bus.chat"),
+            3 => self.i18n.text("ui.bus.fx_return"),
+            _ => format!("BUS {}", bus_index + 1),
+        }
+    }
+
     fn scene_preset_name(&self, preset: usize) -> String {
         match preset {
             SCENE_PRESET_MONITOR_FOCUS => self.i18n.text("ui.preset.monitor_focus"),
@@ -25,20 +35,29 @@ impl NaluminaApp {
         for node_id in node_ids {
             let mut state = self
                 .channel_state
-                .load_or_default(node_id, Self::default_channel_state());
+                .load_or_default(node_id, Self::default_channel_state(self.mix_bus_count));
 
             match preset {
                 SCENE_PRESET_MONITOR_FOCUS => {
-                    state.send_monitor = 1.0;
-                    state.send_stream = 0.55;
+                    if let Some(send) = state.sends.get_mut(0) {
+                        *send = 1.0;
+                    }
+                    if let Some(send) = state.sends.get_mut(1) {
+                        *send = 0.55;
+                    }
                 }
                 SCENE_PRESET_STREAM_BOOST => {
-                    state.send_monitor = 0.7;
-                    state.send_stream = 1.0;
+                    if let Some(send) = state.sends.get_mut(0) {
+                        *send = 0.7;
+                    }
+                    if let Some(send) = state.sends.get_mut(1) {
+                        *send = 1.0;
+                    }
                 }
                 _ => {
-                    state.send_monitor = 0.9;
-                    state.send_stream = 0.9;
+                    for send in &mut state.sends {
+                        *send = 0.9;
+                    }
                 }
             }
 
@@ -112,6 +131,20 @@ impl NaluminaApp {
                         .changed()
                     {
                         self.visible_channel_limit = visible_limit as usize;
+                    }
+
+                    ui.separator();
+                    ui.label(self.i18n.text("ui.label.mix_outputs_count"));
+                    let mut mix_outputs = self.mix_bus_count as u32;
+                    if ui
+                        .add(
+                            egui::DragValue::new(&mut mix_outputs)
+                                .range(1..=MAX_MIX_BUS_COUNT as u32)
+                                .speed(0.2),
+                        )
+                        .changed()
+                    {
+                        self.mix_bus_count = mix_outputs as usize;
                     }
 
                     ui.separator();
@@ -213,7 +246,7 @@ impl NaluminaApp {
             });
     }
 
-    fn render_mix_outputs(&self, ui: &mut egui::Ui, mix_levels: MixLevels) {
+    fn render_mix_outputs(&self, ui: &mut egui::Ui, mix_levels: &MixLevels) {
         section_header(
             ui,
             self.i18n.text("ui.section.mix_outputs"),
@@ -221,22 +254,25 @@ impl NaluminaApp {
         );
         ui.add_space(8.0);
 
-        ui.label(egui::RichText::new(self.i18n.text("ui.label.monitor_mix_level")).strong());
-        percent_progress_bar(
-            ui,
-            mix_levels.monitor,
-            220.0,
+        let palette = [
             egui::Color32::from_rgb(0, 168, 255),
-        );
-
-        ui.add_space(6.0);
-        ui.label(egui::RichText::new(self.i18n.text("ui.label.stream_mix_level")).strong());
-        percent_progress_bar(
-            ui,
-            mix_levels.stream,
-            220.0,
             egui::Color32::from_rgb(0, 197, 143),
-        );
+            egui::Color32::from_rgb(231, 177, 34),
+            egui::Color32::from_rgb(255, 112, 67),
+            egui::Color32::from_rgb(125, 187, 255),
+            egui::Color32::from_rgb(135, 216, 176),
+            egui::Color32::from_rgb(255, 205, 105),
+            egui::Color32::from_rgb(255, 151, 127),
+        ];
+
+        for (bus_index, level) in mix_levels.buses.iter().enumerate() {
+            if bus_index > 0 {
+                ui.add_space(6.0);
+            }
+
+            ui.label(egui::RichText::new(self.mix_bus_label(bus_index)).strong());
+            percent_progress_bar(ui, *level, 220.0, palette[bus_index % palette.len()]);
+        }
     }
 
     fn render_node_browser(&self, ui: &mut egui::Ui) {
@@ -281,7 +317,10 @@ impl NaluminaApp {
             });
     }
 
-    fn render_scene_summary(&self, ui: &mut egui::Ui, mix_levels: MixLevels) {
+    fn render_scene_summary(&self, ui: &mut egui::Ui, mix_levels: &MixLevels) {
+        let monitor = mix_levels.buses.first().copied().unwrap_or(0.0);
+        let stream = mix_levels.buses.get(1).copied().unwrap_or(0.0);
+
         ui.add_space(10.0);
         egui::Frame::none()
             .fill(egui::Color32::from_rgb(17, 23, 35))
@@ -297,8 +336,8 @@ impl NaluminaApp {
                     ui.label(self.i18n.text_with(
                         "ui.route.summary",
                         &[
-                            ("monitor", format!("{:.0}%", mix_levels.monitor * 100.0)),
-                            ("stream", format!("{:.0}%", mix_levels.stream * 100.0)),
+                            ("monitor", format!("{:.0}%", monitor * 100.0)),
+                            ("stream", format!("{:.0}%", stream * 100.0)),
                         ],
                     ));
                 });
@@ -314,11 +353,11 @@ impl NaluminaApp {
 
             let mix_levels = self.calculate_mix_levels();
             ui.columns(2, |columns| {
-                self.render_mix_outputs(&mut columns[0], mix_levels);
+                self.render_mix_outputs(&mut columns[0], &mix_levels);
                 self.render_node_browser(&mut columns[1]);
             });
 
-            self.render_scene_summary(ui, mix_levels);
+            self.render_scene_summary(ui, &mix_levels);
         });
     }
 }
