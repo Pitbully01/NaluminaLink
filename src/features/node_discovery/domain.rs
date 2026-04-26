@@ -3,4 +3,5 @@ pub struct NodeEntry {
     pub id: u32,
     pub name: String,
     pub description: String,
+    pub volume_hint: Option<f32>,
 }

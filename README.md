@@ -76,25 +76,29 @@ RUST_LOG=nalumina_link=debug cargo run
 ## Project Structure
 
 - `src/main.rs` - app entrypoint and CLI command orchestration
-- `src/ui/mod.rs` - desktop UI bootstrap and `NaluminaApp` root state
-- `src/ui/components.rs` - shared UI helper components (section headers and progress bars)
-- `src/ui/state/mod.rs` - UI state module wiring
-- `src/ui/state/channel_state.rs` - centralized channel state store for levels, mute, and sends
-- `src/ui/state/status_keys.rs` - typed i18n key enum for UI status messages
-- `src/ui/state/status_state.rs` - centralized UI status message state and transitions
-- `src/ui/render/mod.rs` - render module wiring
-- `src/ui/render/layout.rs` - panel layout and main composition
-- `src/ui/render/channel_strip.rs` - channel strip state and controls
-- `src/ui/render/mix.rs` - monitor/stream mix calculations
-- `src/ui/refresh/mod.rs` - refresh module wiring
-- `src/ui/refresh/worker.rs` - node refresh worker start logic
-- `src/ui/refresh/polling.rs` - non-blocking refresh polling and status handling
-- `src/ui/refresh/result.rs` - typed refresh result/error objects (including error source metadata)
-- `src/ui/refresh/defaults.rs` - node default channel state synchronization
-- `src/ui/theme.rs` - UI theme setup
-- `src/node_discovery.rs` - PipeWire node collection and CLI node rendering
-- `src/models.rs` - shared app models and UI constants
-- `src/i18n.rs` - language loading and placeholder interpolation
+- `src/features/mod.rs` - feature module wiring
+- `src/features/node_discovery/mod.rs` - node discovery feature exports
+- `src/features/node_discovery/domain.rs` - node discovery domain model (`NodeEntry`)
+- `src/features/node_discovery/service.rs` - PipeWire node collection and CLI node rendering
+- `src/features/ui/mod.rs` - desktop UI bootstrap and `NaluminaApp` root state
+- `src/features/ui/components/mod.rs` - shared UI helper components (section headers and progress bars)
+- `src/features/ui/state/mod.rs` - UI state module wiring and exports
+- `src/features/ui/state/channel_state.rs` - channel state store, mix data types, and UI defaults
+- `src/features/ui/state/status_keys.rs` - typed i18n key enum for UI status messages
+- `src/features/ui/state/status_state.rs` - centralized UI status message state and transitions
+- `src/features/ui/render/mod.rs` - render module wiring
+- `src/features/ui/render/layout.rs` - panel layout and main composition
+- `src/features/ui/render/channel_strip.rs` - channel strip state and controls
+- `src/features/ui/render/mix.rs` - monitor/stream mix calculations
+- `src/features/ui/refresh/mod.rs` - refresh module wiring
+- `src/features/ui/refresh/worker.rs` - node refresh worker start logic
+- `src/features/ui/refresh/polling.rs` - non-blocking refresh polling and status handling
+- `src/features/ui/refresh/result.rs` - typed refresh result/error objects (including error source metadata)
+- `src/features/ui/refresh/defaults.rs` - node default channel state synchronization
+- `src/features/ui/theme.rs` - UI theme setup
+- `src/shared/mod.rs` - shared module wiring
+- `src/shared/i18n/mod.rs` - shared i18n exports
+- `src/shared/i18n/loader.rs` - language loading and placeholder interpolation
 - `lang/en.json` - English translation strings
 - `lang/de.json` - German translation strings
 - `context.md` - live project context and engineering constraints

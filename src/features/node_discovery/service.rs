@@ -12,6 +12,16 @@ use super::domain::NodeEntry;
 
 static PIPEWIRE_INIT: Once = Once::new();
 
+fn parse_volume_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<f32> {
+    let keys = ["volume", "node.volume", "audio.volume", "channelmix.volume"];
+
+    keys.iter().find_map(|key| {
+        props
+            .and_then(|properties| properties.get(key))
+            .and_then(|raw| raw.trim().parse::<f32>().ok())
+    })
+}
+
 fn ensure_pipewire_init() {
     PIPEWIRE_INIT.call_once(|| {
         debug!("node_discovery: process-wide pipewire init");
@@ -62,18 +72,20 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                     return;
                 }
 
-                let props = global.props.as_ref();
+                let props = global.props.as_deref();
                 let node_name = props
                     .and_then(|properties| properties.get("node.name"))
                     .unwrap_or("<unnamed>");
                 let node_description = props
                     .and_then(|properties| properties.get("node.description"))
                     .unwrap_or("");
+                let volume_hint = parse_volume_hint(props);
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,
                     name: node_name.to_string(),
                     description: node_description.to_string(),
+                    volume_hint,
                 });
             })
             .global_remove(|_global_id| {})

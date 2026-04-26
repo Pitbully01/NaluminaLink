@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-pub const DEFAULT_CHANNEL_LEVEL: f32 = 0.72;
+pub const DEFAULT_CHANNEL_LEVEL: f32 = 1.0;
 pub const DEFAULT_MONITOR_SEND: f32 = 1.0;
 pub const DEFAULT_STREAM_SEND: f32 = 0.82;
 pub const MAX_VISIBLE_CHANNELS: usize = 10;

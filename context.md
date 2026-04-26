@@ -27,6 +27,8 @@ This is **not** intended to be a classic mixer. Conceptually, it is closer to:
 - [ ] GUI for control and monitoring
 - [ ] CLI for debug and automation
 - [x] Early desktop test UI
+- [x] Dual-mix UI baseline (monitor/stream sends)
+- [x] Modular feature/shared folder structure
 
 ---
 
@@ -140,7 +142,19 @@ Current status:
 - `cargo run` starts the desktop test UI
 - `cargo run -- list-nodes` lists PipeWire nodes in CLI
 - `cargo run -- doctor` prints a basic health/status message
+- UI includes dual-mix sends, node filtering, visible-channel limits, and scene presets
+- refresh flow uses background worker + polling with typed result/error handling
 - CLI remains a debug and automation companion
+
+---
+
+## Current Code Layout
+
+Current source layout follows feature-oriented modules with shared infrastructure:
+
+- `src/features/node_discovery/` for node discovery domain/service
+- `src/features/ui/` for UI composition, rendering, state, and refresh flows
+- `src/shared/i18n/` for language loading and translation access
 
 ---
 
@@ -208,7 +222,9 @@ Status: implemented as the first working baseline.
 
 - simple pass-through filter node
 
-Next practical step: expand the GUI structure into channel view, routing controls, and monitoring workflow.
+Status: not implemented yet.
+
+Current practical step: expand from UI control baseline to actual routing/filter graph execution in PipeWire.
 
 ### Phase 3
 
