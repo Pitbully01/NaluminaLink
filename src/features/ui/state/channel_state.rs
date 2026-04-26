@@ -15,14 +15,6 @@ pub struct ChannelStripState {
 }
 
 impl ChannelStripState {
-    pub fn meter_value(&self) -> f32 {
-        if self.muted {
-            0.0
-        } else {
-            self.level
-        }
-    }
-
     fn normalized_with(&self, defaults: &ChannelStripState) -> ChannelStripState {
         let mut sends = self.sends.clone();
         let target_len = defaults.sends.len();

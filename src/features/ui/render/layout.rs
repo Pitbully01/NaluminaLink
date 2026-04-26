@@ -12,6 +12,16 @@ const SCENE_PRESET_STREAM_BOOST: usize = 2;
 const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 
 impl NaluminaApp {
+    fn mix_matrix_row_label(node: &NodeEntry) -> String {
+        let mut chars = node.name.chars();
+        let short_name: String = chars.by_ref().take(18).collect();
+        if chars.next().is_some() {
+            format!("{}...", short_name)
+        } else {
+            short_name
+        }
+    }
+
     pub(super) fn mix_bus_label(&self, bus_index: usize) -> String {
         match bus_index {
             0 => self.i18n.text("ui.channel.monitor_send"),
@@ -215,34 +225,89 @@ impl NaluminaApp {
             });
     }
 
-    fn render_channel_rack(&mut self, ui: &mut egui::Ui) {
+    fn render_mix_matrix(&mut self, ui: &mut egui::Ui) {
         section_header(
             ui,
-            self.i18n.text("ui.section.channel_rack"),
-            self.i18n.text("ui.section.channel_rack_subtitle"),
+            self.i18n.text("ui.section.mix_matrix"),
+            self.i18n.text("ui.section.mix_matrix_subtitle"),
         );
         ui.add_space(6.0);
 
-        egui::ScrollArea::horizontal()
-            .id_source("channel_rack")
+        if self.nodes.is_empty() {
+            ui.label(self.i18n.text("nodes.empty"));
+            return;
+        }
+
+        let visible_nodes = self.visible_nodes();
+        if visible_nodes.is_empty() {
+            ui.label(self.i18n.text("ui.nodes.filter_empty"));
+            return;
+        }
+
+        egui::ScrollArea::both()
+            .id_source("mix_matrix")
+            .max_height(320.0)
             .show(ui, |ui| {
-                ui.horizontal(|ui| {
-                    if self.nodes.is_empty() {
-                        ui.label(self.i18n.text("nodes.empty"));
-                        return;
-                    }
+                egui::Grid::new("mix_matrix_grid")
+                    .striped(true)
+                    .min_col_width(96.0)
+                    .show(ui, |ui| {
+                        ui.label(egui::RichText::new(self.i18n.text("ui.label.channels")).strong());
+                        for bus_index in 0..self.mix_bus_count {
+                            ui.label(egui::RichText::new(self.mix_bus_label(bus_index)).strong());
+                        }
+                        ui.end_row();
 
-                    let visible_nodes = self.visible_nodes();
+                        for node in &visible_nodes {
+                            ui.label(Self::mix_matrix_row_label(node));
 
-                    if visible_nodes.is_empty() {
-                        ui.label(self.i18n.text("ui.nodes.filter_empty"));
-                        return;
-                    }
+                            let mut state = self.channel_state.load_or_default(
+                                node.id,
+                                Self::default_channel_state(self.mix_bus_count),
+                            );
+                            let mut changed = false;
 
-                    for node in &visible_nodes {
-                        self.draw_channel_strip(ui, node);
-                    }
-                });
+                            for bus_index in 0..self.mix_bus_count {
+                                let Some(send) = state.sends.get_mut(bus_index) else {
+                                    continue;
+                                };
+
+                                ui.horizontal(|ui| {
+                                    let mute_button = egui::Button::new(
+                                        self.i18n.text("ui.matrix.mute"),
+                                    )
+                                    .fill(if state.muted {
+                                        egui::Color32::from_rgb(160, 32, 32)
+                                    } else {
+                                        egui::Color32::from_rgb(46, 56, 74)
+                                    });
+
+                                    if ui.add_sized([24.0, 18.0], mute_button).clicked() {
+                                        state.muted = !state.muted;
+                                        changed = true;
+                                    }
+
+                                    if ui
+                                        .add_sized(
+                                            [62.0, 18.0],
+                                            egui::Slider::new(send, 0.0..=1.0)
+                                                .show_value(false)
+                                                .trailing_fill(true),
+                                        )
+                                        .changed()
+                                    {
+                                        changed = true;
+                                    }
+                                });
+                            }
+
+                            if changed {
+                                self.channel_state.store(node.id, state);
+                            }
+
+                            ui.end_row();
+                        }
+                    });
             });
     }
 
@@ -348,7 +413,7 @@ impl NaluminaApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             self.render_workspace_controls(ui);
             ui.add_space(10.0);
-            self.render_channel_rack(ui);
+            self.render_mix_matrix(ui);
             ui.add_space(14.0);
 
             let mix_levels = self.calculate_mix_levels();
