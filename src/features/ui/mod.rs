@@ -38,11 +38,31 @@ pub struct NaluminaApp {
     node_filter: String,
     visible_channel_limit: usize,
     mix_bus_count: usize,
+    mix_bus_names: Vec<String>,
     selected_scene_preset: usize,
 }
 
 impl NaluminaApp {
+    fn default_mix_bus_name(i18n: &I18n, bus_index: usize) -> String {
+        match bus_index {
+            0 => i18n.text("ui.bus.monitor"),
+            1 => i18n.text("ui.bus.stream"),
+            2 => i18n.text("ui.bus.chat"),
+            3 => i18n.text("ui.bus.fx_return"),
+            _ => i18n.text_with("ui.bus.generic", &[("index", (bus_index + 1).to_string())]),
+        }
+    }
+
+    fn default_mix_bus_names(i18n: &I18n, count: usize) -> Vec<String> {
+        (0..count)
+            .map(|index| Self::default_mix_bus_name(i18n, index))
+            .collect()
+    }
+
     pub fn new(i18n: I18n) -> Self {
+        let mix_bus_count = DEFAULT_MIX_BUS_COUNT;
+        let mix_bus_names = Self::default_mix_bus_names(&i18n, mix_bus_count);
+
         let mut app = Self {
             status: UiStatus::new(&i18n),
             i18n,
@@ -51,7 +71,8 @@ impl NaluminaApp {
             channel_state: ChannelStateStore::new(),
             node_filter: String::new(),
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
-            mix_bus_count: DEFAULT_MIX_BUS_COUNT,
+            mix_bus_count,
+            mix_bus_names,
             selected_scene_preset: 0,
         };
 

@@ -22,14 +22,27 @@ impl NaluminaApp {
         }
     }
 
-    pub(super) fn mix_bus_label(&self, bus_index: usize) -> String {
-        match bus_index {
-            0 => self.i18n.text("ui.channel.monitor_send"),
-            1 => self.i18n.text("ui.channel.stream_send"),
-            2 => self.i18n.text("ui.bus.chat"),
-            3 => self.i18n.text("ui.bus.fx_return"),
-            _ => format!("BUS {}", bus_index + 1),
+    fn sync_mix_bus_names(&mut self) {
+        let target = self.mix_bus_count;
+
+        if self.mix_bus_names.len() < target {
+            let start = self.mix_bus_names.len();
+            for bus_index in start..target {
+                self.mix_bus_names
+                    .push(Self::default_mix_bus_name(&self.i18n, bus_index));
+            }
         }
+
+        if self.mix_bus_names.len() > target {
+            self.mix_bus_names.truncate(target);
+        }
+    }
+
+    pub(super) fn mix_bus_label(&self, bus_index: usize) -> String {
+        self.mix_bus_names
+            .get(bus_index)
+            .cloned()
+            .unwrap_or_else(|| Self::default_mix_bus_name(&self.i18n, bus_index))
     }
 
     fn scene_preset_name(&self, preset: usize) -> String {
@@ -155,10 +168,49 @@ impl NaluminaApp {
                         .changed()
                     {
                         self.mix_bus_count = mix_outputs as usize;
+                        self.sync_mix_bus_names();
                     }
 
                     ui.separator();
                     self.render_scene_preset_buttons(ui);
+                });
+
+                ui.add_space(8.0);
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(self.i18n.text("ui.label.mix_output_names"));
+
+                    for bus_index in 0..self.mix_bus_count {
+                        ui.label(
+                            egui::RichText::new(format!("{}:", bus_index + 1))
+                                .small()
+                                .weak(),
+                        );
+
+                        let mut name = self
+                            .mix_bus_names
+                            .get(bus_index)
+                            .cloned()
+                            .unwrap_or_else(|| Self::default_mix_bus_name(&self.i18n, bus_index));
+
+                        let response = ui.add_sized(
+                            [100.0, 22.0],
+                            egui::TextEdit::singleline(&mut name)
+                                .hint_text(self.i18n.text("ui.placeholder.mix_output_name")),
+                        );
+
+                        if response.changed() {
+                            let trimmed = name.trim();
+                            let final_name = if trimmed.is_empty() {
+                                Self::default_mix_bus_name(&self.i18n, bus_index)
+                            } else {
+                                trimmed.to_string()
+                            };
+
+                            if let Some(slot) = self.mix_bus_names.get_mut(bus_index) {
+                                *slot = final_name;
+                            }
+                        }
+                    }
                 });
             });
     }
@@ -411,6 +463,7 @@ impl NaluminaApp {
 
     pub(in crate::features::ui) fn render_main_panel(&mut self, ctx: &egui::Context) {
         egui::CentralPanel::default().show(ctx, |ui| {
+            self.sync_mix_bus_names();
             self.render_workspace_controls(ui);
             ui.add_space(10.0);
             self.render_mix_matrix(ui);
