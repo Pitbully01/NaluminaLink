@@ -4,4 +4,5 @@ pub struct NodeEntry {
     pub name: String,
     pub description: String,
     pub volume_hint: Option<f32>,
+    pub channels_hint: Option<u8>,
 }

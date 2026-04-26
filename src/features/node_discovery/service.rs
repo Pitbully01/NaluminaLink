@@ -22,6 +22,16 @@ fn parse_volume_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<f3
     })
 }
 
+fn parse_channels_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<u8> {
+    let keys = ["audio.channels", "channel.count", "node.channels"];
+
+    keys.iter().find_map(|key| {
+        props
+            .and_then(|properties| properties.get(key))
+            .and_then(|raw| raw.trim().parse::<u8>().ok())
+    })
+}
+
 fn ensure_pipewire_init() {
     PIPEWIRE_INIT.call_once(|| {
         debug!("node_discovery: process-wide pipewire init");
@@ -80,12 +90,14 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                     .and_then(|properties| properties.get("node.description"))
                     .unwrap_or("");
                 let volume_hint = parse_volume_hint(props);
+                let channels_hint = parse_channels_hint(props);
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,
                     name: node_name.to_string(),
                     description: node_description.to_string(),
                     volume_hint,
+                    channels_hint,
                 });
             })
             .global_remove(|_global_id| {})

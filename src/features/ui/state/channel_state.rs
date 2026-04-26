@@ -10,27 +10,40 @@ pub const MAX_MIX_BUS_COUNT: usize = 8;
 #[derive(Clone, Debug)]
 pub struct ChannelStripState {
     pub level: f32,
-    pub muted: bool,
     pub sends: Vec<f32>,
+    pub output_mutes: Vec<bool>,
 }
 
 impl ChannelStripState {
     fn normalized_with(&self, defaults: &ChannelStripState) -> ChannelStripState {
         let mut sends = self.sends.clone();
-        let target_len = defaults.sends.len();
+        let mut output_mutes = self.output_mutes.clone();
+        let target_len = defaults.sends.len().max(defaults.output_mutes.len());
 
         if sends.len() < target_len {
             sends.extend(defaults.sends[sends.len()..target_len].iter().copied());
+        }
+
+        if output_mutes.len() < target_len {
+            output_mutes.extend(
+                defaults.output_mutes[output_mutes.len()..target_len]
+                    .iter()
+                    .copied(),
+            );
         }
 
         if sends.len() > target_len {
             sends.truncate(target_len);
         }
 
+        if output_mutes.len() > target_len {
+            output_mutes.truncate(target_len);
+        }
+
         ChannelStripState {
             level: self.level,
-            muted: self.muted,
             sends,
+            output_mutes,
         }
     }
 }
@@ -74,8 +87,8 @@ impl ChannelStateStore {
             .cloned()
             .unwrap_or(ChannelStripState {
                 level: DEFAULT_CHANNEL_LEVEL,
-                muted: false,
                 sends: Vec::new(),
+                output_mutes: Vec::new(),
             })
     }
 
@@ -88,13 +101,12 @@ impl ChannelStateStore {
             return 0.0;
         };
 
-        let send = state.sends.get(bus_index).copied().unwrap_or(0.0);
-
-        if state.muted {
-            0.0
-        } else {
-            state.level * send
+        if state.output_mutes.get(bus_index).copied().unwrap_or(false) {
+            return 0.0;
         }
+
+        let send = state.sends.get(bus_index).copied().unwrap_or(0.0);
+        state.level * send
     }
 }
 
@@ -106,8 +118,8 @@ mod tests {
     fn defaults() -> ChannelStripState {
         ChannelStripState {
             level: 0.5,
-            muted: false,
             sends: vec![0.8, 0.6],
+            output_mutes: vec![false, false],
         }
     }
 
@@ -129,14 +141,14 @@ mod tests {
         state.level = 0.9;
         state.sends[0] = 0.2;
         state.sends[1] = 0.3;
-        state.muted = true;
+        state.output_mutes[0] = true;
         store.store(77, state);
 
         let reloaded = store.load_or_default(77, defaults());
         assert_eq!(reloaded.level, 0.9);
         assert_eq!(reloaded.sends[0], 0.2);
         assert_eq!(reloaded.sends[1], 0.3);
-        assert!(reloaded.muted);
+        assert!(reloaded.output_mutes[0]);
     }
 
     #[test]
@@ -144,8 +156,8 @@ mod tests {
         let mut store = ChannelStateStore::new();
         let state = ChannelStripState {
             level: 0.75,
-            muted: false,
             sends: vec![0.4, 0.9],
+            output_mutes: vec![false, false],
         };
         store.store(5, state.clone());
 
@@ -157,7 +169,7 @@ mod tests {
         store.store(
             5,
             ChannelStripState {
-                muted: true,
+                output_mutes: vec![true, true],
                 ..state
             },
         );
@@ -173,8 +185,8 @@ mod tests {
             9,
             ChannelStripState {
                 level: 0.5,
-                muted: false,
                 sends: vec![0.7, 0.4],
+                output_mutes: vec![false, false],
             },
         );
 
@@ -182,8 +194,8 @@ mod tests {
             9,
             ChannelStripState {
                 level: 0.5,
-                muted: false,
                 sends: vec![1.0, 0.8, 0.6],
+                output_mutes: vec![false, false, false],
             },
         );
 
@@ -193,8 +205,8 @@ mod tests {
             9,
             ChannelStripState {
                 level: 0.5,
-                muted: false,
                 sends: vec![1.0],
+                output_mutes: vec![false],
             },
         );
 

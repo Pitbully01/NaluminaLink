@@ -3,17 +3,17 @@ use crate::features::ui::state::MixLevels;
 
 impl NaluminaApp {
     fn calculate_mix_level(&self, bus_index: usize) -> f32 {
-        if self.nodes.is_empty() {
+        if self.input_channels.is_empty() {
             return 0.0;
         }
 
         let sum = self
-            .nodes
+            .input_channels
             .iter()
-            .map(|node| self.channel_state.effective_mix(node.id, bus_index))
+            .map(|channel| self.channel_state.effective_mix(channel.id, bus_index))
             .sum::<f32>();
 
-        sum / self.nodes.len() as f32
+        sum / self.input_channels.len() as f32
     }
 
     pub(super) fn calculate_mix_levels(&self) -> MixLevels {
