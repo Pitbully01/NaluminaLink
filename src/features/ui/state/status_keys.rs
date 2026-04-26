@@ -4,7 +4,6 @@ pub(in crate::features::ui) enum StatusKey {
     LoadedNodes,
     RefreshFailed,
     RefreshDisconnected,
-    SceneApplied,
     DoctorMessage,
     RefreshErrorSourceNodeDiscovery,
 }
@@ -17,7 +16,6 @@ impl StatusKey {
             StatusKey::LoadedNodes => "status.loaded_nodes",
             StatusKey::RefreshFailed => "status.refresh_failed",
             StatusKey::RefreshDisconnected => "status.refresh_disconnected",
-            StatusKey::SceneApplied => "status.scene_applied",
             StatusKey::DoctorMessage => "doctor.message",
             StatusKey::RefreshErrorSourceNodeDiscovery => {
                 "status.refresh_error_source.node_discovery"
@@ -37,7 +35,6 @@ mod tests {
         assert_eq!(StatusKey::LoadedNodes.as_str(), "status.loaded_nodes");
         assert_eq!(StatusKey::RefreshFailed.as_str(), "status.refresh_failed");
         assert_eq!(StatusKey::RefreshDisconnected.as_str(), "status.refresh_disconnected");
-        assert_eq!(StatusKey::SceneApplied.as_str(), "status.scene_applied");
         assert_eq!(StatusKey::DoctorMessage.as_str(), "doctor.message");
         assert_eq!(
             StatusKey::RefreshErrorSourceNodeDiscovery.as_str(),

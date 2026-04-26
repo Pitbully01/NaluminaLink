@@ -48,7 +48,6 @@ pub struct NaluminaApp {
     visible_channel_limit: usize,
     mix_bus_count: usize,
     mix_bus_names: Vec<String>,
-    selected_scene_preset: usize,
 }
 
 impl NaluminaApp {
@@ -99,7 +98,6 @@ impl NaluminaApp {
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
             mix_bus_count,
             mix_bus_names,
-            selected_scene_preset: 0,
         };
 
         app.start_refresh();

@@ -131,7 +131,7 @@ mod tests {
         assert_eq!(state.level, 0.5);
         assert_eq!(state.sends[0], 0.8);
         assert_eq!(state.sends[1], 0.6);
-        assert!(!state.muted);
+        assert_eq!(state.output_mutes, vec![false, false]);
     }
 
     #[test]

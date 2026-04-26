@@ -49,11 +49,6 @@ impl UiStatus {
         self.message = Self::resolve_text(i18n, StatusKey::RefreshDisconnected);
     }
 
-    pub(in crate::features::ui) fn set_scene_applied(&mut self, i18n: &I18n, preset: String) {
-        self.message =
-            Self::resolve_text_with(i18n, StatusKey::SceneApplied, &[("preset", preset)]);
-    }
-
     pub(in crate::features::ui) fn set_doctor_message(&mut self, i18n: &I18n) {
         self.message = Self::resolve_text(i18n, StatusKey::DoctorMessage);
     }
@@ -99,14 +94,5 @@ mod tests {
 
         assert!(status.text().contains("Node discovery"));
         assert!(status.text().contains("pw core disconnected"));
-    }
-
-    #[test]
-    fn scene_applied_status_contains_selected_preset_name() {
-        let i18n = i18n_en();
-        let mut status = UiStatus::new(&i18n);
-        status.set_scene_applied(&i18n, "Monitor Focus".to_string());
-
-        assert!(status.text().contains("Monitor Focus"));
     }
 }

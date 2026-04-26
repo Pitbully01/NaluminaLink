@@ -26,7 +26,10 @@ impl NaluminaApp {
         vec![false; mix_bus_count]
     }
 
-    fn source_volume_hint(&self, source_node_id: Option<u32>) -> Option<f32> {
+    pub(in crate::features::ui) fn source_volume_hint(
+        &self,
+        source_node_id: Option<u32>,
+    ) -> Option<f32> {
         let node_id = source_node_id?;
         self.nodes
             .iter()
@@ -55,7 +58,7 @@ impl NaluminaApp {
         self.channel_state.ensure_defaults(channel_id, state);
     }
 
-    pub(in crate::features::ui::refresh) fn sync_input_channel_defaults(&mut self) {
+    pub(in crate::features::ui) fn sync_input_channel_defaults(&mut self) {
         let channels: Vec<(u32, Option<u32>)> = self
             .input_channels
             .iter()
