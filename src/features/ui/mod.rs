@@ -127,6 +127,6 @@ impl eframe::App for NaluminaApp {
         self.render_status_bar(ctx);
         self.render_main_panel(ctx);
 
-        ctx.request_repaint_after(std::time::Duration::from_millis(33));
+        ctx.request_repaint_after(std::time::Duration::from_millis(16));
     }
 }

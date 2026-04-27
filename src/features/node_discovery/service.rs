@@ -151,12 +151,12 @@ fn normalize_gain_hint(value: f32) -> f32 {
 
 pub fn sample_source_levels(node_id: u32, channels_hint: Option<u8>) -> Option<(f32, f32)> {
     let channels = channels_hint.unwrap_or(2).clamp(1, 2);
-    let sample_count = u32::from(channels) * 2048;
+    let sample_count = u32::from(channels) * 128;
 
     let output = Command::new("timeout")
         .args([
             "--signal=KILL",
-            "0.20s",
+            "0.05s",
             "pw-cat",
             "--record",
             "--raw",

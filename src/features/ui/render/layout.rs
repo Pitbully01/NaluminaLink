@@ -6,9 +6,11 @@ use crate::features::ui::state::{MixLevels, MAX_MIX_BUS_COUNT};
 
 const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 const FADER_DB_MIN: f32 = -60.0;
-const FADER_DB_MAX: f32 = 12.0;
+const FADER_DB_MAX: f32 = 0.0;
 const MUTE_DB_EPSILON: f32 = 0.001;
-const FADER_DB_TICKS: [f32; 8] = [-60.0, -30.0, -20.0, -10.0, -5.0, 0.0, 6.0, 12.0];
+const FADER_DB_TICKS: [f32; 11] = [
+    -60.0, -54.0, -48.0, -42.0, -36.0, -30.0, -24.0, -18.0, -12.0, -6.0, 0.0,
+];
 
 impl NaluminaApp {
     fn gain_to_db(gain: f32) -> f32 {
@@ -35,19 +37,8 @@ impl NaluminaApp {
         }
     }
 
-    fn render_db_ticks(ui: &mut egui::Ui) {
-        let ticks = FADER_DB_TICKS
-            .iter()
-            .map(|tick| {
-                if *tick > 0.0 {
-                    format!("+{tick:.0}")
-                } else {
-                    format!("{tick:.0}")
-                }
-            })
-            .collect::<Vec<String>>()
-            .join("  ");
-        ui.label(egui::RichText::new(ticks).small().weak());
+    fn db_to_meter_pos(db: f32) -> f32 {
+        ((db - FADER_DB_MIN) / (FADER_DB_MAX - FADER_DB_MIN)).clamp(0.0, 1.0)
     }
 
     fn source_live_levels(&self, source_node_id: Option<u32>) -> (f32, f32) {
@@ -59,8 +50,11 @@ impl NaluminaApp {
             return (0.0, 0.0);
         };
 
-        if let Some(levels) = self.live_meter_store.reading(node_id) {
-            return (levels.left.clamp(0.0, 1.0), levels.right.clamp(0.0, 1.0));
+        if let Some(snapshot) = self.live_meter_store.reading(node_id) {
+            return (
+                snapshot.current.left.clamp(0.0, 1.0),
+                snapshot.current.right.clamp(0.0, 1.0),
+            );
         }
 
         let fallback = node.volume_hint.unwrap_or(0.0).clamp(0.0, 1.0);
@@ -69,10 +63,27 @@ impl NaluminaApp {
         (left, right)
     }
 
-    fn meter_fill_color(level: f32) -> egui::Color32 {
-        if level < 0.65 {
+    fn source_live_level(&self, source_node_id: Option<u32>) -> f32 {
+        let (left, right) = self.source_live_levels(source_node_id);
+        left.max(right)
+    }
+
+    fn source_peak_level(&self, source_node_id: Option<u32>) -> f32 {
+        let Some(node_id) = source_node_id else {
+            return 0.0;
+        };
+
+        if let Some(snapshot) = self.live_meter_store.reading(node_id) {
+            return snapshot.peak.left.max(snapshot.peak.right).clamp(0.0, 1.0);
+        }
+
+        self.source_live_level(source_node_id)
+    }
+
+    fn meter_fill_color_db(db: f32) -> egui::Color32 {
+        if db < -18.0 {
             egui::Color32::from_rgb(0, 197, 143)
-        } else if level < 0.85 {
+        } else if db < -6.0 {
             egui::Color32::from_rgb(231, 177, 34)
         } else {
             egui::Color32::from_rgb(219, 68, 55)
@@ -80,68 +91,142 @@ impl NaluminaApp {
     }
 
     fn meter_zone_color(level: f32) -> egui::Color32 {
-        Self::meter_fill_color(level)
+        Self::meter_fill_color_db(Self::gain_to_db(level.clamp(0.0, 1.0)))
     }
 
-    fn render_input_monitor_meter(ui: &mut egui::Ui, label: &str, gain: f32) {
-        let level = gain.clamp(0.0, 1.0);
+    fn render_compact_fader(
+        ui: &mut egui::Ui,
+        level_db: &mut f32,
+        live_level: f32,
+        peak_level: f32,
+        width: f32,
+    ) -> bool {
+        let mut changed = false;
         ui.vertical(|ui| {
-            ui.label(egui::RichText::new(label).small().strong());
+            let desired_size = egui::vec2(width.max(160.0), 18.0);
+            let (rect, response) =
+                ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
-            let desired_size = egui::vec2(146.0, 12.0);
-            let (rect, _) = ui.allocate_exact_size(desired_size, egui::Sense::hover());
+            if (response.dragged() || response.clicked())
+                && response.interact_pointer_pos().is_some()
+            {
+                if let Some(pointer) = response.interact_pointer_pos() {
+                    let t = ((pointer.x - rect.left()) / rect.width()).clamp(0.0, 1.0);
+                    let next_db = FADER_DB_MIN + t * (FADER_DB_MAX - FADER_DB_MIN);
+                    if (next_db - *level_db).abs() > 0.05 {
+                        *level_db = next_db;
+                        changed = true;
+                    }
+                }
+            }
+
             let painter = ui.painter_at(rect);
-            let rounding = egui::Rounding::same(4.0);
+            let rounding = egui::Rounding::same(5.0);
 
             painter.rect_filled(rect, rounding, egui::Color32::from_rgb(18, 22, 30));
 
-            let zone_edges = [0.65_f32, 0.85_f32, 1.0_f32];
-            let zone_colors = [
-                egui::Color32::from_rgba_unmultiplied(0, 197, 143, 90),
-                egui::Color32::from_rgba_unmultiplied(231, 177, 34, 100),
-                egui::Color32::from_rgba_unmultiplied(219, 68, 55, 110),
-            ];
-
-            let mut start = 0.0_f32;
-            for (edge, color) in zone_edges.iter().zip(zone_colors.iter()) {
-                let left = rect.left() + rect.width() * start;
-                let right = rect.left() + rect.width() * *edge;
-                let zone_rect = egui::Rect::from_min_max(
-                    egui::pos2(left, rect.top()),
-                    egui::pos2(right, rect.bottom()),
-                );
-                painter.rect_filled(zone_rect, rounding, *color);
-                start = *edge;
-            }
-
-            let fill_rect = egui::Rect::from_min_max(
-                rect.left_top(),
-                egui::pos2(rect.left() + rect.width() * level, rect.bottom()),
+            painter.line_segment(
+                [
+                    egui::pos2(rect.left(), rect.center().y),
+                    egui::pos2(rect.right(), rect.center().y),
+                ],
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 0, 0)),
             );
-            painter.rect_filled(fill_rect, rounding, Self::meter_fill_color(level).linear_multiply(0.88));
-            painter.rect_stroke(rect, rounding, egui::Stroke::new(1.0, egui::Color32::from_rgb(68, 80, 100)));
+
+            let live_db = Self::gain_to_db(live_level.clamp(0.0, 1.0));
+            let live = Self::db_to_meter_pos(live_db);
+            let live_rect = egui::Rect::from_min_max(
+                rect.left_top(),
+                egui::pos2(rect.left() + rect.width() * live, rect.bottom()),
+            );
+            painter.rect_filled(
+                live_rect,
+                rounding,
+                Self::meter_fill_color_db(live_db).linear_multiply(0.78),
+            );
+
+            let peak_db = Self::gain_to_db(peak_level.clamp(0.0, 1.0));
+            let peak = Self::db_to_meter_pos(peak_db);
+            let peak_x = rect.left() + rect.width() * peak;
+            painter.line_segment(
+                [
+                    egui::pos2(peak_x, rect.top() - 2.0),
+                    egui::pos2(peak_x, rect.bottom() + 2.0),
+                ],
+                egui::Stroke::new(1.5, egui::Color32::from_rgb(255, 208, 72)),
+            );
 
             for tick in FADER_DB_TICKS {
-                let tick_level = Self::db_to_gain(tick);
-                let x = rect.left() + rect.width() * tick_level.clamp(0.0, 1.0);
+                let x = rect.left() + rect.width() * Self::db_to_meter_pos(tick);
                 painter.line_segment(
                     [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
-                    egui::Stroke::new(0.5, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 35)),
+                    egui::Stroke::new(
+                        0.5,
+                        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 30),
+                    ),
                 );
             }
 
-            ui.label(egui::RichText::new(Self::format_db(Self::gain_to_db(level))).small());
+            let handle_x = rect.left() + rect.width() * Self::db_to_meter_pos(*level_db);
+            let handle_center = egui::pos2(handle_x, rect.center().y);
+            let handle_color = if response.dragged() {
+                egui::Color32::from_rgb(219, 227, 244)
+            } else {
+                egui::Color32::from_rgb(189, 199, 220)
+            };
+            painter.circle_filled(handle_center, 6.0, handle_color);
+            painter.circle_stroke(
+                handle_center,
+                6.0,
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 82, 106)),
+            );
+
+            painter.rect_stroke(
+                rect,
+                rounding,
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(68, 80, 100)),
+            );
+
+            ui.add_space(2.0);
+            ui.label(egui::RichText::new(Self::format_db(live_db)).small());
         });
+
+        changed
     }
 
-    fn render_zone_meter(ui: &mut egui::Ui, level: f32, width: f32) {
-        let clamped = level.clamp(0.0, 1.0);
-        ui.add(
-            egui::ProgressBar::new(clamped)
-                .desired_width(width)
-                .fill(Self::meter_zone_color(clamped))
-                .show_percentage(),
+    fn render_avatar(ui: &mut egui::Ui, label: &str) {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(64.0, 64.0), egui::Sense::hover());
+        let painter = ui.painter_at(rect);
+        let rounding = egui::Rounding::same(10.0);
+
+        painter.rect_filled(rect, rounding, egui::Color32::from_rgb(25, 31, 42));
+        painter.rect_stroke(
+            rect,
+            rounding,
+            egui::Stroke::new(1.0, egui::Color32::from_rgb(76, 87, 108)),
         );
+
+        painter.text(
+            rect.center(),
+            egui::Align2::CENTER_CENTER,
+            label,
+            egui::FontId::proportional(20.0),
+            egui::Color32::from_rgb(230, 236, 245),
+        );
+    }
+
+    fn avatar_label(name: &str) -> String {
+        let letters: String = name
+            .chars()
+            .filter(|ch| ch.is_ascii_alphabetic())
+            .take(2)
+            .collect();
+
+        if letters.is_empty() {
+            "?".to_string()
+        } else {
+            letters.to_uppercase()
+        }
     }
 
     fn sync_mix_bus_names(&mut self) {
@@ -185,44 +270,6 @@ impl NaluminaApp {
             .find(|node| node.id == node_id)
             .map(|node| node.name.clone())
             .unwrap_or_else(|| self.i18n.text("ui.device.unassigned"))
-    }
-
-    fn source_layout_label(&self, source_node_id: Option<u32>) -> String {
-        let node = source_node_id.and_then(|id| self.nodes.iter().find(|entry| entry.id == id));
-        let keyword_channels = node.and_then(|entry| {
-            let haystack = format!(
-                "{} {}",
-                entry.name.to_lowercase(),
-                entry.description.to_lowercase()
-            );
-            let tokens: Vec<&str> = haystack
-                .split(|ch: char| !ch.is_ascii_alphanumeric())
-                .filter(|token| !token.is_empty())
-                .collect();
-
-            if tokens.iter().any(|token| *token == "mono") {
-                Some(1)
-            } else if tokens.iter().any(|token| *token == "stereo") {
-                Some(2)
-            } else {
-                None
-            }
-        });
-
-        let channels = node
-            .and_then(|entry| entry.channels_hint)
-            .or(keyword_channels)
-            .or_else(|| {
-                let has_right = node.and_then(|entry| entry.peak_right_hint).is_some();
-                if has_right { Some(2) } else { Some(1) }
-            })
-            .unwrap_or(2);
-
-        if channels <= 1 {
-            self.i18n.text("ui.layout.mono")
-        } else {
-            self.i18n.text("ui.layout.stereo")
-        }
     }
 
     fn visible_input_channels(&self) -> Vec<InputChannel> {
@@ -380,102 +427,103 @@ impl NaluminaApp {
             return;
         }
 
-        egui::ScrollArea::both()
+        egui::ScrollArea::vertical()
             .id_source("mix_matrix")
-            .max_height(360.0)
+            .max_height(480.0)
             .show(ui, |ui| {
-                egui::Grid::new("mix_matrix_grid")
-                    .striped(true)
-                    .min_col_width(112.0)
-                    .show(ui, |ui| {
-                        ui.label(egui::RichText::new(self.i18n.text("ui.label.channels")).strong());
-                        for bus_index in 0..self.mix_bus_count {
-                            let mut name = self
-                                .mix_bus_names
-                                .get(bus_index)
-                                .cloned()
-                                .unwrap_or_else(|| {
-                                    Self::default_mix_bus_name(&self.i18n, bus_index)
-                                });
-                            let response = ui.add_sized(
-                                [112.0, 22.0],
-                                egui::TextEdit::singleline(&mut name)
-                                    .hint_text(self.i18n.text("ui.placeholder.mix_output_name")),
-                            );
+                for channel in &visible_channels {
+                    let channel_id = channel.id;
+                    let source_node_id = channel.source_node_id;
+                    let source_label = self.source_label(source_node_id);
+                    let avatar = Self::avatar_label(&channel.name);
 
-                            if response.changed() {
-                                let trimmed = name.trim();
-                                let final_name = if trimmed.is_empty() {
-                                    Self::default_mix_bus_name(&self.i18n, bus_index)
-                                } else {
-                                    trimmed.to_string()
-                                };
+                    let mut channel_name = channel.name.clone();
+                    let mut state = self.channel_state.load_or_default(
+                        channel_id,
+                        Self::default_channel_state(
+                            self.mix_bus_count,
+                            self.source_volume_hint(source_node_id),
+                        ),
+                    );
+                    let mut changed = false;
+                    let live_level = self.source_live_level(source_node_id);
+                    let peak_level = self.source_peak_level(source_node_id);
 
-                                if let Some(slot) = self.mix_bus_names.get_mut(bus_index) {
-                                    *slot = final_name;
-                                }
-                            }
-                        }
-                        ui.end_row();
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_rgb(20, 26, 38))
+                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
+                        .rounding(egui::Rounding::same(8.0))
+                        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                Self::render_avatar(ui, &avatar);
+                                ui.add_space(8.0);
 
-                        for channel in &visible_channels {
-                            let channel_id = channel.id;
-                            let source_node_id = channel.source_node_id;
+                                ui.vertical(|ui| {
+                                    let name_response = ui.add_sized(
+                                        [220.0, 22.0],
+                                        egui::TextEdit::singleline(&mut channel_name)
+                                            .hint_text(self.i18n.text("ui.placeholder.input_name")),
+                                    );
 
-                            let mut channel_name = channel.name.clone();
-                            let source_label = self.source_label(source_node_id);
-                            let layout_label = self.source_layout_label(source_node_id);
-                            let (live_left, live_right) = self.source_live_levels(source_node_id);
+                                    if name_response.changed() {
+                                        let final_name = if channel_name.trim().is_empty() {
+                                            self.i18n.text_with(
+                                                "ui.input.default_name",
+                                                &[("index", channel_id.to_string())],
+                                            )
+                                        } else {
+                                            channel_name.trim().to_string()
+                                        };
 
-                            let mut state = self.channel_state.load_or_default(
-                                channel_id,
-                                Self::default_channel_state(
-                                    self.mix_bus_count,
-                                    self.source_volume_hint(source_node_id),
-                                ),
-                            );
-                            let mut changed = false;
-
-                            ui.vertical(|ui| {
-                                let name_response = ui.add_sized(
-                                    [140.0, 22.0],
-                                    egui::TextEdit::singleline(&mut channel_name)
-                                        .hint_text(self.i18n.text("ui.placeholder.input_name")),
-                                );
-
-                                if name_response.changed() {
-                                    let final_name = if channel_name.trim().is_empty() {
-                                        self.i18n.text_with(
-                                            "ui.input.default_name",
-                                            &[("index", channel_id.to_string())],
-                                        )
-                                    } else {
-                                        channel_name.trim().to_string()
-                                    };
-
-                                    if let Some(entry) = self
-                                        .input_channels
-                                        .iter_mut()
-                                        .find(|entry| entry.id == channel_id)
-                                    {
-                                        entry.name = final_name;
+                                        if let Some(entry) = self
+                                            .input_channels
+                                            .iter_mut()
+                                            .find(|entry| entry.id == channel_id)
+                                        {
+                                            entry.name = final_name;
+                                        }
                                     }
-                                }
 
-                                ui.label(
-                                    egui::RichText::new(self.i18n.text_with(
-                                        "ui.input.layout",
-                                        &[("layout", layout_label.clone())],
-                                    ))
-                                    .small(),
+                                    ui.add_space(2.0);
+                                    ui.label(
+                                        egui::RichText::new(source_label.clone()).small().weak(),
+                                    );
+                                });
+
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        if ui.small_button("FX").clicked() {
+                                            // placeholder for future filter panel
+                                        }
+                                    },
                                 );
+                            });
 
-                                egui::ComboBox::from_id_source(format!(
-                                    "source_combo_{}",
-                                    channel_id
-                                ))
+                            ui.add_space(6.0);
+                            ui.horizontal(|ui| {
+                                ui.add_space(72.0);
+                                ui.vertical(|ui| {
+                                    let mut level_db = Self::gain_to_db(state.level);
+                                    let slider_width = ui.available_width().max(220.0);
+                                    if Self::render_compact_fader(
+                                        ui,
+                                        &mut level_db,
+                                        live_level,
+                                        peak_level,
+                                        slider_width,
+                                    ) {
+                                        state.level = Self::db_to_gain(level_db);
+                                        changed = true;
+                                    }
+                                });
+                            });
+
+                            ui.add_space(4.0);
+                            egui::ComboBox::from_id_source(format!("source_combo_{}", channel_id))
                                 .selected_text(source_label)
-                                .width(140.0)
+                                .width(220.0)
                                 .show_ui(ui, |ui| {
                                     let mut selected = source_node_id;
                                     if ui
@@ -514,119 +562,13 @@ impl NaluminaApp {
                                     }
                                 });
 
-                                let mut level_db = Self::gain_to_db(state.level);
-                                if ui
-                                    .add_sized(
-                                        [140.0, 18.0],
-                                        egui::Slider::new(
-                                            &mut level_db,
-                                            FADER_DB_MIN..=FADER_DB_MAX,
-                                        )
-                                        .show_value(false)
-                                        .trailing_fill(true),
-                                    )
-                                    .changed()
-                                {
-                                    state.level = Self::db_to_gain(level_db);
-                                    changed = true;
-                                }
-
-                                ui.label(
-                                    egui::RichText::new(self.i18n.text("ui.label.input_monitor"))
-                                        .small(),
-                                );
-                                Self::render_input_monitor_meter(ui, "L", live_left);
-                                if layout_label == self.i18n.text("ui.layout.stereo") {
-                                    Self::render_input_monitor_meter(ui, "R", live_right);
-                                }
-                                Self::render_db_ticks(ui);
-
-                                ui.label(
-                                    egui::RichText::new(self.i18n.text_with(
-                                        "ui.input.global_level",
-                                        &[(
-                                            "value",
-                                            Self::format_db(Self::gain_to_db(state.level)),
-                                        )],
-                                    ))
-                                    .small(),
-                                );
-                                Self::render_zone_meter(ui, state.level, 140.0);
-                            });
-
-                            for bus_index in 0..self.mix_bus_count {
-                                let Some(send) = state.sends.get_mut(bus_index) else {
-                                    continue;
-                                };
-
-                                while state.output_mutes.len() <= bus_index {
-                                    state.output_mutes.push(false);
-                                }
-
-                                let local_mute = state.output_mutes[bus_index];
-
-                                ui.horizontal(|ui| {
-                                    let mute_button =
-                                        egui::Button::new(self.i18n.text("ui.matrix.local_mute"))
-                                            .fill(if local_mute {
-                                                egui::Color32::from_rgb(166, 44, 44)
-                                            } else {
-                                                egui::Color32::from_rgb(46, 56, 74)
-                                            });
-
-                                    if ui.add_sized([24.0, 18.0], mute_button).clicked() {
-                                        state.output_mutes[bus_index] =
-                                            !state.output_mutes[bus_index];
-                                        changed = true;
-                                    }
-
-                                    let mut send_db = Self::gain_to_db(*send);
-                                    if ui
-                                        .add_sized(
-                                            [62.0, 18.0],
-                                            egui::Slider::new(
-                                                &mut send_db,
-                                                FADER_DB_MIN..=FADER_DB_MAX,
-                                            )
-                                            .show_value(false)
-                                            .trailing_fill(true),
-                                        )
-                                        .changed()
-                                    {
-                                        *send = Self::db_to_gain(send_db);
-                                        changed = true;
-                                    }
-
-                                    ui.vertical(|ui| {
-                                        let current = if state.output_mutes[bus_index] {
-                                            0.0
-                                        } else {
-                                            state.level * *send
-                                        };
-
-                                        ui.label(
-                                            egui::RichText::new(Self::format_db(send_db)).small(),
-                                        );
-                                        Self::render_zone_meter(ui, current, 36.0);
-
-                                        if layout_label == self.i18n.text("ui.layout.stereo") {
-                                            Self::render_zone_meter(
-                                                ui,
-                                                (current * 0.92).clamp(0.0, 1.0),
-                                                36.0,
-                                            );
-                                        }
-                                    });
-                                });
-                            }
-
                             if changed {
                                 self.channel_state.store(channel_id, state);
                             }
+                        });
 
-                            ui.end_row();
-                        }
-                    });
+                    ui.add_space(8.0);
+                }
             });
     }
 
