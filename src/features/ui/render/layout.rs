@@ -209,7 +209,11 @@ impl NaluminaApp {
                 egui::Color32::from_rgb(216, 224, 235)
             };
             painter.circle_filled(handle_center, 3.0, handle_color);
-            painter.circle_stroke(handle_center, 3.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(85, 95, 112)));
+            painter.circle_stroke(
+                handle_center,
+                3.0,
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(85, 95, 112)),
+            );
 
             painter.rect_stroke(
                 rect,
@@ -227,7 +231,11 @@ impl NaluminaApp {
         let rounding = egui::Rounding::same(4.0);
 
         painter.rect_filled(rect, rounding, egui::Color32::from_rgb(231, 236, 242));
-        painter.rect_stroke(rect, rounding, egui::Stroke::new(1.0, egui::Color32::from_rgb(130, 141, 161)));
+        painter.rect_stroke(
+            rect,
+            rounding,
+            egui::Stroke::new(1.0, egui::Color32::from_rgb(130, 141, 161)),
+        );
 
         painter.text(
             rect.center(),
@@ -507,19 +515,25 @@ impl NaluminaApp {
                                                 ui.label(
                                                     egui::RichText::new(source_label.clone())
                                                         .size(11.0)
-                                                        .color(egui::Color32::from_rgb(155, 170, 188)),
+                                                        .color(egui::Color32::from_rgb(
+                                                            155, 170, 188,
+                                                        )),
                                                 );
                                             });
 
                                             ui.add_space(6.0);
 
-                                            let mute_button = egui::Button::new(if state.muted { "MUT" } else { "SPK" })
-                                                .min_size(egui::vec2(28.0, 16.0))
-                                                .fill(if state.muted {
-                                                    egui::Color32::from_rgb(166, 44, 44)
-                                                } else {
-                                                    egui::Color32::from_rgb(49, 62, 81)
-                                                });
+                                            let mute_button = egui::Button::new(if state.muted {
+                                                "MUT"
+                                            } else {
+                                                "SPK"
+                                            })
+                                            .min_size(egui::vec2(28.0, 16.0))
+                                            .fill(if state.muted {
+                                                egui::Color32::from_rgb(166, 44, 44)
+                                            } else {
+                                                egui::Color32::from_rgb(49, 62, 81)
+                                            });
 
                                             if ui.add(mute_button).clicked() {
                                                 state.muted = !state.muted;
@@ -588,36 +602,54 @@ impl NaluminaApp {
                     let card_size = egui::vec2(360.0, 70.0);
                     let inner_size = egui::vec2(356.0, 66.0);
 
-                    ui.allocate_ui_with_layout(card_size, egui::Layout::top_down(egui::Align::Min), |ui| {
-                        ui.set_min_size(card_size);
-                        ui.set_max_size(card_size);
+                    ui.allocate_ui_with_layout(
+                        card_size,
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.set_min_size(card_size);
+                            ui.set_max_size(card_size);
 
-                        egui::Frame::none()
-                            .fill(egui::Color32::from_rgb(20, 26, 38))
-                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
-                            .rounding(egui::Rounding::same(6.0))
-                            .inner_margin(egui::Margin::symmetric(2.0, 1.0))
-                            .show(ui, |ui| {
-                                ui.set_min_size(inner_size);
-                                ui.set_max_size(inner_size);
+                            egui::Frame::none()
+                                .fill(egui::Color32::from_rgb(20, 26, 38))
+                                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
+                                .rounding(egui::Rounding::same(6.0))
+                                .inner_margin(egui::Margin::symmetric(2.0, 1.0))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(inner_size);
+                                    ui.set_max_size(inner_size);
 
-                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                                    Self::render_avatar(ui, &avatar);
-                                    ui.add_space(4.0);
+                                    ui.with_layout(
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            Self::render_avatar(ui, &avatar);
+                                            ui.add_space(4.0);
 
-                                    ui.vertical(|ui| {
-                                        ui.label(egui::RichText::new(bus_name).size(13.0).strong());
-                                        ui.label(
-                                            egui::RichText::new(Self::format_db(Self::gain_to_db(*level)))
-                                                .size(11.0),
-                                        );
-                                    });
+                                            ui.vertical(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new(bus_name)
+                                                        .size(13.0)
+                                                        .strong(),
+                                                );
+                                                ui.label(
+                                                    egui::RichText::new(Self::format_db(
+                                                        Self::gain_to_db(*level),
+                                                    ))
+                                                    .size(11.0),
+                                                );
+                                            });
 
-                                    ui.add_space(6.0);
-                                    percent_progress_bar(ui, *level, 170.0, Self::meter_zone_color(*level));
+                                            ui.add_space(6.0);
+                                            percent_progress_bar(
+                                                ui,
+                                                *level,
+                                                170.0,
+                                                Self::meter_zone_color(*level),
+                                            );
+                                        },
+                                    );
                                 });
-                            });
-                    });
+                        },
+                    );
                     ui.add_space(6.0);
                 }
             });
