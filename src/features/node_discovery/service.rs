@@ -36,9 +36,49 @@ fn parse_peak_hint(props: Option<&pw::spa::utils::dict::DictRef>, keys: &[&str])
     keys.iter().find_map(|key| {
         props
             .and_then(|properties| properties.get(key))
-            .and_then(|raw| raw.trim().parse::<f32>().ok())
+            .and_then(|raw| parse_float_tokens(raw).first().copied())
             .map(|value| value.clamp(0.0, 1.0))
     })
+}
+
+fn parse_peak_channel_hint(
+    props: Option<&pw::spa::utils::dict::DictRef>,
+    keys: &[&str],
+    channel_index: usize,
+) -> Option<f32> {
+    keys.iter().find_map(|key| {
+        props
+            .and_then(|properties| properties.get(key))
+            .and_then(|raw| parse_float_tokens(raw).get(channel_index).copied())
+            .map(|value| value.clamp(0.0, 1.0))
+    })
+}
+
+fn parse_float_tokens(raw: &str) -> Vec<f32> {
+    let mut values = Vec::new();
+    let mut token = String::new();
+
+    for ch in raw.chars() {
+        if ch.is_ascii_digit() || matches!(ch, '.' | '-' | '+' | 'e' | 'E') {
+            token.push(ch);
+            continue;
+        }
+
+        if !token.is_empty() {
+            if let Ok(value) = token.parse::<f32>() {
+                values.push(value);
+            }
+            token.clear();
+        }
+    }
+
+    if !token.is_empty() {
+        if let Ok(value) = token.parse::<f32>() {
+            values.push(value);
+        }
+    }
+
+    values
 }
 
 fn ensure_pipewire_init() {
@@ -102,12 +142,39 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                 let channels_hint = parse_channels_hint(props);
                 let peak_left_hint = parse_peak_hint(
                     props,
-                    &["audio.peak.left", "peak.left", "peak.l", "meter.left"],
+                    &[
+                        "audio.peak.left",
+                        "peak.left",
+                        "peak.l",
+                        "meter.left",
+                        "monitor.peak.left",
+                    ],
                 );
                 let peak_right_hint = parse_peak_hint(
                     props,
-                    &["audio.peak.right", "peak.right", "peak.r", "meter.right"],
-                );
+                    &[
+                        "audio.peak.right",
+                        "peak.right",
+                        "peak.r",
+                        "meter.right",
+                        "monitor.peak.right",
+                    ],
+                )
+                .or_else(|| {
+                    parse_peak_channel_hint(
+                        props,
+                        &["audio.peak", "peak", "monitor.peak", "monitor.channel-peaks"],
+                        1,
+                    )
+                });
+
+                let peak_left_hint = peak_left_hint.or_else(|| {
+                    parse_peak_channel_hint(
+                        props,
+                        &["audio.peak", "peak", "monitor.peak", "monitor.channel-peaks"],
+                        0,
+                    )
+                });
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,

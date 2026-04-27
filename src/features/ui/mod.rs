@@ -1,4 +1,5 @@
 use std::sync::mpsc::Receiver;
+use std::time::{Duration, Instant};
 
 use eframe::egui;
 
@@ -48,9 +49,12 @@ pub struct NaluminaApp {
     visible_channel_limit: usize,
     mix_bus_count: usize,
     mix_bus_names: Vec<String>,
+    last_auto_refresh: Instant,
 }
 
 impl NaluminaApp {
+    const AUTO_REFRESH_INTERVAL: Duration = Duration::from_millis(120);
+
     fn default_input_channels(i18n: &I18n) -> Vec<InputChannel> {
         (0..6)
             .map(|index| InputChannel {
@@ -98,10 +102,24 @@ impl NaluminaApp {
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
             mix_bus_count,
             mix_bus_names,
+            last_auto_refresh: Instant::now(),
         };
 
         app.start_refresh();
         app
+    }
+
+    fn maybe_schedule_auto_refresh(&mut self) {
+        if self.refresh_inflight.is_some() {
+            return;
+        }
+
+        if self.last_auto_refresh.elapsed() < Self::AUTO_REFRESH_INTERVAL {
+            return;
+        }
+
+        self.start_refresh();
+        self.last_auto_refresh = Instant::now();
     }
 }
 
@@ -109,6 +127,7 @@ impl eframe::App for NaluminaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         Self::apply_theme(ctx);
         self.poll_refresh();
+        self.maybe_schedule_auto_refresh();
 
         self.render_top_bar(ctx);
         self.render_status_bar(ctx);
