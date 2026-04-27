@@ -3,7 +3,7 @@ use std::error::Error;
 use std::rc::Rc;
 use std::sync::Once;
 
-use log::{debug, error, info};
+use log::{debug, error};
 use pipewire as pw;
 
 use crate::shared::i18n::I18n;
@@ -18,17 +18,44 @@ fn parse_volume_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<f3
     keys.iter().find_map(|key| {
         props
             .and_then(|properties| properties.get(key))
-            .and_then(|raw| raw.trim().parse::<f32>().ok())
+            .and_then(|raw| parse_float_tokens(raw).first().copied())
+            .map(normalize_gain_hint)
     })
 }
 
 fn parse_channels_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<u8> {
-    let keys = ["audio.channels", "channel.count", "node.channels"];
+    let numeric_keys = ["audio.channels", "channel.count", "node.channels"];
 
-    keys.iter().find_map(|key| {
+    let numeric_hint = numeric_keys.iter().find_map(|key| {
         props
             .and_then(|properties| properties.get(key))
-            .and_then(|raw| raw.trim().parse::<u8>().ok())
+            .and_then(|raw| parse_float_tokens(raw).first().copied())
+            .map(|value| value.round().clamp(1.0, 64.0) as u8)
+    });
+
+    if numeric_hint.is_some() {
+        return numeric_hint;
+    }
+
+    let map_keys = ["audio.position", "audio.positions", "audio.channel-map"];
+
+    map_keys.iter().find_map(|key| {
+        props
+            .and_then(|properties| properties.get(key))
+            .and_then(|raw| {
+                let labels = parse_channel_labels(raw);
+                if labels.is_empty() {
+                    None
+                } else if labels.iter().any(|label| label == "MONO") {
+                    Some(1)
+                } else if labels.iter().any(|label| label == "STEREO") {
+                    Some(2)
+                } else if labels.len() == 1 {
+                    None
+                } else {
+                    Some(labels.len().clamp(1, 64) as u8)
+                }
+            })
     })
 }
 
@@ -79,6 +106,45 @@ fn parse_float_tokens(raw: &str) -> Vec<f32> {
     }
 
     values
+}
+
+fn parse_channel_labels(raw: &str) -> Vec<String> {
+    let mut labels = Vec::new();
+    let mut token = String::new();
+
+    for ch in raw.chars() {
+        if ch.is_ascii_alphabetic() || ch == '_' {
+            token.push(ch.to_ascii_uppercase());
+            continue;
+        }
+
+        if !token.is_empty() {
+            labels.push(token.clone());
+            token.clear();
+        }
+    }
+
+    if !token.is_empty() {
+        labels.push(token);
+    }
+
+    labels
+}
+
+fn normalize_gain_hint(value: f32) -> f32 {
+    if !value.is_finite() {
+        return 0.0;
+    }
+
+    if value > 1.0 {
+        if value <= 100.0 {
+            (value / 100.0).clamp(0.0, 1.0)
+        } else {
+            1.0
+        }
+    } else {
+        value.clamp(0.0, 1.0)
+    }
 }
 
 fn ensure_pipewire_init() {
@@ -163,18 +229,51 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                 .or_else(|| {
                     parse_peak_channel_hint(
                         props,
-                        &["audio.peak", "peak", "monitor.peak", "monitor.channel-peaks"],
+                        &[
+                            "audio.peak",
+                            "peak",
+                            "monitor.peak",
+                            "monitor.channel-peaks",
+                        ],
+                        1,
+                    )
+                })
+                .or_else(|| {
+                    parse_peak_channel_hint(
+                        props,
+                        &[
+                            "monitor.channel-volumes",
+                            "channelmix.volumes",
+                            "audio.channel.volumes",
+                        ],
                         1,
                     )
                 });
 
-                let peak_left_hint = peak_left_hint.or_else(|| {
-                    parse_peak_channel_hint(
-                        props,
-                        &["audio.peak", "peak", "monitor.peak", "monitor.channel-peaks"],
-                        0,
-                    )
-                });
+                let peak_left_hint = peak_left_hint
+                    .or_else(|| {
+                        parse_peak_channel_hint(
+                            props,
+                            &[
+                                "audio.peak",
+                                "peak",
+                                "monitor.peak",
+                                "monitor.channel-peaks",
+                            ],
+                            0,
+                        )
+                    })
+                    .or_else(|| {
+                        parse_peak_channel_hint(
+                            props,
+                            &[
+                                "monitor.channel-volumes",
+                                "channelmix.volumes",
+                                "audio.channel.volumes",
+                            ],
+                            0,
+                        )
+                    });
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,
@@ -206,7 +305,7 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
         Err(_) => return Err("failed to unwrap collected nodes".into()),
     };
 
-    info!("node_discovery: collected {} nodes", nodes.len());
+    debug!("node_discovery: collected {} nodes", nodes.len());
 
     Ok(nodes)
 }

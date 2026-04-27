@@ -1,7 +1,7 @@
 use std::sync::mpsc;
 use std::thread;
 
-use log::{debug, error, info};
+use log::{debug, error};
 
 use super::super::NaluminaApp;
 use super::{RefreshError, RefreshResult};
@@ -16,7 +16,7 @@ impl NaluminaApp {
         let (sender, receiver) = mpsc::channel();
         self.refresh_inflight = Some(receiver);
         self.status.set_refreshing(&self.i18n);
-        info!("refresh: started background node discovery");
+        debug!("refresh: started background node discovery");
 
         thread::spawn(move || {
             let result = match collect_nodes() {

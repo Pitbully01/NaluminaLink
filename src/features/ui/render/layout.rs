@@ -143,9 +143,34 @@ impl NaluminaApp {
     }
 
     fn source_layout_label(&self, source_node_id: Option<u32>) -> String {
-        let channels = source_node_id
-            .and_then(|id| self.nodes.iter().find(|node| node.id == id))
-            .and_then(|node| node.channels_hint)
+        let node = source_node_id.and_then(|id| self.nodes.iter().find(|entry| entry.id == id));
+        let keyword_channels = node.and_then(|entry| {
+            let haystack = format!(
+                "{} {}",
+                entry.name.to_lowercase(),
+                entry.description.to_lowercase()
+            );
+            let tokens: Vec<&str> = haystack
+                .split(|ch: char| !ch.is_ascii_alphanumeric())
+                .filter(|token| !token.is_empty())
+                .collect();
+
+            if tokens.iter().any(|token| *token == "mono") {
+                Some(1)
+            } else if tokens.iter().any(|token| *token == "stereo") {
+                Some(2)
+            } else {
+                None
+            }
+        });
+
+        let channels = node
+            .and_then(|entry| entry.channels_hint)
+            .or(keyword_channels)
+            .or_else(|| {
+                let has_right = node.and_then(|entry| entry.peak_right_hint).is_some();
+                if has_right { Some(2) } else { Some(1) }
+            })
             .unwrap_or(2);
 
         if channels <= 1 {

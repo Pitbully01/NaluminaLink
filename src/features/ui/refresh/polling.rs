@@ -1,6 +1,6 @@
 use std::sync::mpsc;
 
-use log::{debug, error, info};
+use log::{debug, error};
 
 use super::super::NaluminaApp;
 use super::{RefreshError, RefreshResult};
@@ -8,7 +8,7 @@ use crate::features::node_discovery::NodeEntry;
 
 impl NaluminaApp {
     fn on_refresh_success(&mut self, nodes: Vec<NodeEntry>) {
-        info!("refresh: success with {} nodes", nodes.len());
+        debug!("refresh: success with {} nodes", nodes.len());
         self.status.set_loaded_nodes(&self.i18n, nodes.len());
         self.nodes = nodes;
         self.sync_input_channel_defaults();

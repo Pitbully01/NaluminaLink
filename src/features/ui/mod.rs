@@ -53,7 +53,7 @@ pub struct NaluminaApp {
 }
 
 impl NaluminaApp {
-    const AUTO_REFRESH_INTERVAL: Duration = Duration::from_millis(120);
+    const AUTO_REFRESH_INTERVAL: Duration = Duration::from_millis(400);
 
     fn default_input_channels(i18n: &I18n) -> Vec<InputChannel> {
         (0..6)
