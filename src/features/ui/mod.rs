@@ -1,5 +1,4 @@
 use std::sync::mpsc::Receiver;
-use std::time::{Duration, Instant};
 
 use eframe::egui;
 
@@ -13,7 +12,9 @@ mod state;
 mod theme;
 
 use refresh::RefreshResult;
-use state::{ChannelStateStore, UiStatus, DEFAULT_MIX_BUS_COUNT, MAX_VISIBLE_CHANNELS};
+use state::{
+    ChannelStateStore, LiveMeterStore, UiStatus, DEFAULT_MIX_BUS_COUNT, MAX_VISIBLE_CHANNELS,
+};
 
 #[derive(Clone, Debug)]
 pub(in crate::features::ui) struct InputChannel {
@@ -43,19 +44,16 @@ pub struct NaluminaApp {
     status: UiStatus,
     refresh_inflight: Option<Receiver<RefreshResult>>,
     channel_state: ChannelStateStore,
+    live_meter_store: LiveMeterStore,
     input_channels: Vec<InputChannel>,
     next_input_channel_id: u32,
     node_filter: String,
     visible_channel_limit: usize,
     mix_bus_count: usize,
     mix_bus_names: Vec<String>,
-    last_auto_refresh: Instant,
-    refresh_updates_status: bool,
 }
 
 impl NaluminaApp {
-    const AUTO_REFRESH_INTERVAL: Duration = Duration::from_millis(400);
-
     fn default_input_channels(i18n: &I18n) -> Vec<InputChannel> {
         (0..6)
             .map(|index| InputChannel {
@@ -97,31 +95,26 @@ impl NaluminaApp {
             nodes: Vec::new(),
             refresh_inflight: None,
             channel_state: ChannelStateStore::new(),
+            live_meter_store: LiveMeterStore::new(),
             input_channels,
             next_input_channel_id,
             node_filter: String::new(),
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
             mix_bus_count,
             mix_bus_names,
-            last_auto_refresh: Instant::now(),
-            refresh_updates_status: true,
         };
 
         app.start_refresh();
         app
     }
 
-    fn maybe_schedule_auto_refresh(&mut self) {
-        if self.refresh_inflight.is_some() {
-            return;
-        }
+    pub(in crate::features::ui) fn sync_live_meter_sources(&mut self) {
+        let source_ids = self
+            .input_channels
+            .iter()
+            .filter_map(|channel| channel.source_node_id);
 
-        if self.last_auto_refresh.elapsed() < Self::AUTO_REFRESH_INTERVAL {
-            return;
-        }
-
-        self.start_refresh_silent();
-        self.last_auto_refresh = Instant::now();
+        self.live_meter_store.sync_sources(&self.nodes, source_ids);
     }
 }
 
@@ -129,12 +122,11 @@ impl eframe::App for NaluminaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         Self::apply_theme(ctx);
         self.poll_refresh();
-        self.maybe_schedule_auto_refresh();
 
         self.render_top_bar(ctx);
         self.render_status_bar(ctx);
         self.render_main_panel(ctx);
 
-        ctx.request_repaint_after(std::time::Duration::from_millis(150));
+        ctx.request_repaint_after(std::time::Duration::from_millis(33));
     }
 }

@@ -59,27 +59,17 @@ impl NaluminaApp {
             return (0.0, 0.0);
         };
 
+        if let Some(levels) = self.live_meter_store.reading(node_id) {
+            return (levels.left.clamp(0.0, 1.0), levels.right.clamp(0.0, 1.0));
+        }
+
         let fallback = node.volume_hint.unwrap_or(0.0).clamp(0.0, 1.0);
         let left = node.peak_left_hint.unwrap_or(fallback).clamp(0.0, 1.0);
         let right = node.peak_right_hint.unwrap_or(left).clamp(0.0, 1.0);
         (left, right)
     }
 
-    fn render_input_monitor_fader(ui: &mut egui::Ui, label: &str, gain: f32) {
-        let mut db = Self::gain_to_db(gain);
-        ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(label).small().strong());
-            let _ = ui.add_enabled(
-                false,
-                egui::Slider::new(&mut db, FADER_DB_MIN..=FADER_DB_MAX)
-                    .show_value(false)
-                    .trailing_fill(true),
-            );
-            ui.label(egui::RichText::new(Self::format_db(db)).small());
-        });
-    }
-
-    fn meter_zone_color(level: f32) -> egui::Color32 {
+    fn meter_fill_color(level: f32) -> egui::Color32 {
         if level < 0.65 {
             egui::Color32::from_rgb(0, 197, 143)
         } else if level < 0.85 {
@@ -87,6 +77,61 @@ impl NaluminaApp {
         } else {
             egui::Color32::from_rgb(219, 68, 55)
         }
+    }
+
+    fn meter_zone_color(level: f32) -> egui::Color32 {
+        Self::meter_fill_color(level)
+    }
+
+    fn render_input_monitor_meter(ui: &mut egui::Ui, label: &str, gain: f32) {
+        let level = gain.clamp(0.0, 1.0);
+        ui.vertical(|ui| {
+            ui.label(egui::RichText::new(label).small().strong());
+
+            let desired_size = egui::vec2(146.0, 12.0);
+            let (rect, _) = ui.allocate_exact_size(desired_size, egui::Sense::hover());
+            let painter = ui.painter_at(rect);
+            let rounding = egui::Rounding::same(4.0);
+
+            painter.rect_filled(rect, rounding, egui::Color32::from_rgb(18, 22, 30));
+
+            let zone_edges = [0.65_f32, 0.85_f32, 1.0_f32];
+            let zone_colors = [
+                egui::Color32::from_rgba_unmultiplied(0, 197, 143, 90),
+                egui::Color32::from_rgba_unmultiplied(231, 177, 34, 100),
+                egui::Color32::from_rgba_unmultiplied(219, 68, 55, 110),
+            ];
+
+            let mut start = 0.0_f32;
+            for (edge, color) in zone_edges.iter().zip(zone_colors.iter()) {
+                let left = rect.left() + rect.width() * start;
+                let right = rect.left() + rect.width() * *edge;
+                let zone_rect = egui::Rect::from_min_max(
+                    egui::pos2(left, rect.top()),
+                    egui::pos2(right, rect.bottom()),
+                );
+                painter.rect_filled(zone_rect, rounding, *color);
+                start = *edge;
+            }
+
+            let fill_rect = egui::Rect::from_min_max(
+                rect.left_top(),
+                egui::pos2(rect.left() + rect.width() * level, rect.bottom()),
+            );
+            painter.rect_filled(fill_rect, rounding, Self::meter_fill_color(level).linear_multiply(0.88));
+            painter.rect_stroke(rect, rounding, egui::Stroke::new(1.0, egui::Color32::from_rgb(68, 80, 100)));
+
+            for tick in FADER_DB_TICKS {
+                let tick_level = Self::db_to_gain(tick);
+                let x = rect.left() + rect.width() * tick_level.clamp(0.0, 1.0);
+                painter.line_segment(
+                    [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
+                    egui::Stroke::new(0.5, egui::Color32::from_rgba_unmultiplied(255, 255, 255, 35)),
+                );
+            }
+
+            ui.label(egui::RichText::new(Self::format_db(Self::gain_to_db(level))).small());
+        });
     }
 
     fn render_zone_meter(ui: &mut egui::Ui, level: f32, width: f32) {
@@ -464,6 +509,7 @@ impl NaluminaApp {
                                             entry.source_node_id = selected;
                                         }
                                         self.ensure_input_channel_defaults(channel_id, selected);
+                                        self.sync_live_meter_sources();
                                         changed = true;
                                     }
                                 });
@@ -489,9 +535,9 @@ impl NaluminaApp {
                                     egui::RichText::new(self.i18n.text("ui.label.input_monitor"))
                                         .small(),
                                 );
-                                Self::render_input_monitor_fader(ui, "L", live_left);
+                                Self::render_input_monitor_meter(ui, "L", live_left);
                                 if layout_label == self.i18n.text("ui.layout.stereo") {
-                                    Self::render_input_monitor_fader(ui, "R", live_right);
+                                    Self::render_input_monitor_meter(ui, "R", live_right);
                                 }
                                 Self::render_db_ticks(ui);
 

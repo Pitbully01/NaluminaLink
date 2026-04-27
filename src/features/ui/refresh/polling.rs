@@ -9,18 +9,15 @@ use crate::features::node_discovery::NodeEntry;
 impl NaluminaApp {
     fn on_refresh_success(&mut self, nodes: Vec<NodeEntry>) {
         debug!("refresh: success with {} nodes", nodes.len());
-        if self.refresh_updates_status {
-            self.status.set_loaded_nodes(&self.i18n, nodes.len());
-        }
+        self.status.set_loaded_nodes(&self.i18n, nodes.len());
         self.nodes = nodes;
         self.sync_input_channel_defaults();
-        self.refresh_updates_status = true;
+        self.sync_live_meter_sources();
     }
 
     fn on_refresh_error(&mut self, error: RefreshError) {
         error!("refresh: failed from {:?}: {}", error.source, error.message);
         self.status.set_refresh_failed(&self.i18n, error);
-        self.refresh_updates_status = true;
     }
 
     fn on_refresh_pending(&mut self, receiver: mpsc::Receiver<RefreshResult>) {
@@ -30,7 +27,6 @@ impl NaluminaApp {
     fn on_refresh_disconnected(&mut self) {
         error!("refresh: worker channel disconnected");
         self.status.set_refresh_disconnected(&self.i18n);
-        self.refresh_updates_status = true;
     }
 
     pub(in crate::features::ui) fn poll_refresh(&mut self) {

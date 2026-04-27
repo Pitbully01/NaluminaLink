@@ -149,7 +149,7 @@ fn normalize_gain_hint(value: f32) -> f32 {
     }
 }
 
-fn probe_source_levels(node_id: u32, channels_hint: Option<u8>) -> Option<(f32, f32)> {
+pub fn sample_source_levels(node_id: u32, channels_hint: Option<u8>) -> Option<(f32, f32)> {
     let channels = channels_hint.unwrap_or(2).clamp(1, 2);
     let sample_count = u32::from(channels) * 2048;
 
@@ -375,7 +375,7 @@ pub fn collect_nodes_for_sources(
                 continue;
             }
 
-            if let Some((left, right)) = probe_source_levels(node.id, node.channels_hint) {
+            if let Some((left, right)) = sample_source_levels(node.id, node.channels_hint) {
                 node.peak_left_hint = Some(left);
                 node.peak_right_hint = Some(right);
             }
