@@ -132,7 +132,7 @@ impl NaluminaApp {
 
     fn meter_fill_color_db(db: f32) -> egui::Color32 {
         if db < -18.0 {
-            egui::Color32::from_rgb(0, 197, 143)
+            egui::Color32::from_rgb(46, 197, 105)
         } else if db < -6.0 {
             egui::Color32::from_rgb(231, 177, 34)
         } else {
@@ -173,7 +173,7 @@ impl NaluminaApp {
             let painter = ui.painter_at(rect);
             let rounding = egui::Rounding::same(4.0);
 
-            painter.rect_filled(rect, rounding, egui::Color32::from_rgb(39, 46, 54));
+            painter.rect_filled(rect, rounding, egui::Color32::from_rgb(34, 40, 46));
 
             let live_db = Self::gain_to_db(live_level.clamp(0.0, 1.0));
             let live = Self::db_to_meter_pos(live_db);
@@ -181,14 +181,14 @@ impl NaluminaApp {
                 rect.left_top(),
                 egui::pos2(rect.left() + rect.width() * live, rect.bottom()),
             );
-            painter.rect_filled(live_rect, rounding, egui::Color32::from_rgb(52, 170, 105));
+            painter.rect_filled(live_rect, rounding, egui::Color32::from_rgb(46, 197, 105));
 
             let level = Self::db_to_meter_pos(*level_db);
             let level_rect = egui::Rect::from_min_max(
                 rect.left_top(),
                 egui::pos2(rect.left() + rect.width() * level, rect.bottom()),
             );
-            painter.rect_filled(level_rect, rounding, egui::Color32::from_rgb(63, 224, 124));
+            painter.rect_filled(level_rect, rounding, egui::Color32::from_rgb(78, 214, 120));
 
             let peak_db = Self::gain_to_db(peak_level.clamp(0.0, 1.0));
             let peak = Self::db_to_meter_pos(peak_db);
@@ -223,6 +223,33 @@ impl NaluminaApp {
         });
 
         changed
+    }
+
+    fn render_lr_meter(ui: &mut egui::Ui, left: f32, right: f32) {
+        let size = egui::vec2(46.0, 12.0);
+        let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+        let painter = ui.painter_at(rect);
+        let rounding = egui::Rounding::same(4.0);
+
+        painter.rect_filled(rect, rounding, egui::Color32::from_rgb(33, 40, 48));
+
+        let gap = 6.0;
+        let half = (rect.width() - gap) / 2.0;
+
+        let left_w = half * left.clamp(0.0, 1.0);
+        let right_w = half * right.clamp(0.0, 1.0);
+
+        let left_rect = egui::Rect::from_min_max(
+            rect.left_top(),
+            egui::pos2(rect.left() + left_w, rect.bottom()),
+        );
+        let right_rect = egui::Rect::from_min_max(
+            egui::pos2(rect.left() + half + gap, rect.top()),
+            egui::pos2(rect.left() + half + gap + right_w, rect.bottom()),
+        );
+
+        painter.rect_filled(left_rect, rounding, egui::Color32::from_rgb(46, 197, 105));
+        painter.rect_filled(right_rect, rounding, egui::Color32::from_rgb(46, 197, 105));
     }
 
     fn render_avatar(ui: &mut egui::Ui, label: &str) {
@@ -504,35 +531,39 @@ impl NaluminaApp {
                                         egui::Layout::left_to_right(egui::Align::Center),
                                         |ui| {
                                             Self::render_avatar(ui, &avatar);
-                                            ui.add_space(4.0);
+                                            ui.add_space(6.0);
 
                                             ui.vertical(|ui| {
                                                 ui.label(
                                                     egui::RichText::new(&channel.name)
-                                                        .size(13.0)
+                                                        .size(12.0)
                                                         .strong(),
                                                 );
                                                 ui.label(
                                                     egui::RichText::new(source_label.clone())
-                                                        .size(11.0)
+                                                        .size(10.0)
                                                         .color(egui::Color32::from_rgb(
                                                             155, 170, 188,
                                                         )),
                                                 );
+                                                ui.add_space(4.0);
+                                                let (live_left, live_right) =
+                                                    self.source_live_levels(source_node_id);
+                                                Self::render_lr_meter(ui, live_left, live_right);
                                             });
 
                                             ui.add_space(6.0);
 
                                             let mute_button = egui::Button::new(if state.muted {
-                                                "MUT"
+                                                "🔇"
                                             } else {
-                                                "SPK"
+                                                "🔊"
                                             })
-                                            .min_size(egui::vec2(28.0, 16.0))
+                                            .min_size(egui::vec2(28.0, 20.0))
                                             .fill(if state.muted {
                                                 egui::Color32::from_rgb(166, 44, 44)
                                             } else {
-                                                egui::Color32::from_rgb(49, 62, 81)
+                                                egui::Color32::from_rgb(58, 67, 82)
                                             });
 
                                             if ui.add(mute_button).clicked() {
