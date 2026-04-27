@@ -50,6 +50,7 @@ pub struct NaluminaApp {
     mix_bus_count: usize,
     mix_bus_names: Vec<String>,
     last_auto_refresh: Instant,
+    refresh_updates_status: bool,
 }
 
 impl NaluminaApp {
@@ -103,6 +104,7 @@ impl NaluminaApp {
             mix_bus_count,
             mix_bus_names,
             last_auto_refresh: Instant::now(),
+            refresh_updates_status: true,
         };
 
         app.start_refresh();
@@ -118,7 +120,7 @@ impl NaluminaApp {
             return;
         }
 
-        self.start_refresh();
+        self.start_refresh_silent();
         self.last_auto_refresh = Instant::now();
     }
 }

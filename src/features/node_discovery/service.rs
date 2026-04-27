@@ -1,5 +1,7 @@
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::error::Error;
+use std::process::Command;
 use std::rc::Rc;
 use std::sync::Once;
 
@@ -147,6 +149,55 @@ fn normalize_gain_hint(value: f32) -> f32 {
     }
 }
 
+fn probe_source_levels(node_id: u32, channels_hint: Option<u8>) -> Option<(f32, f32)> {
+    let channels = channels_hint.unwrap_or(2).clamp(1, 2);
+    let sample_count = u32::from(channels) * 2048;
+
+    let output = Command::new("timeout")
+        .args([
+            "--signal=KILL",
+            "0.20s",
+            "pw-cat",
+            "--record",
+            "--raw",
+            "--target",
+            &node_id.to_string(),
+            "--format",
+            "s16",
+            "--channels",
+            &channels.to_string(),
+            "--sample-count",
+            &sample_count.to_string(),
+            "-",
+        ])
+        .output()
+        .ok()?;
+
+    if output.stdout.len() < 4 {
+        return None;
+    }
+
+    let mut left_peak = 0.0_f32;
+    let mut right_peak = 0.0_f32;
+    let stride = usize::from(channels) * 2;
+
+    for frame in output.stdout.chunks_exact(stride) {
+        let left = i16::from_le_bytes([frame[0], frame[1]]) as f32 / i16::MAX as f32;
+        left_peak = left_peak.max(left.abs());
+
+        if channels > 1 {
+            let right = i16::from_le_bytes([frame[2], frame[3]]) as f32 / i16::MAX as f32;
+            right_peak = right_peak.max(right.abs());
+        }
+    }
+
+    if channels == 1 {
+        right_peak = left_peak;
+    }
+
+    Some((left_peak.clamp(0.0, 1.0), right_peak.clamp(0.0, 1.0)))
+}
+
 fn ensure_pipewire_init() {
     PIPEWIRE_INIT.call_once(|| {
         debug!("node_discovery: process-wide pipewire init");
@@ -155,6 +206,12 @@ fn ensure_pipewire_init() {
 }
 
 pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
+    collect_nodes_for_sources(&HashSet::new())
+}
+
+pub fn collect_nodes_for_sources(
+    probed_source_ids: &HashSet<u32>,
+) -> Result<Vec<NodeEntry>, Box<dyn Error>> {
     ensure_pipewire_init();
 
     let nodes = Rc::new(RefCell::new(Vec::new()));
@@ -300,10 +357,30 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
         main_loop.run();
     }
 
-    let nodes = match Rc::try_unwrap(nodes) {
+    let mut nodes = match Rc::try_unwrap(nodes) {
         Ok(nodes) => nodes.into_inner(),
         Err(_) => return Err("failed to unwrap collected nodes".into()),
     };
+
+    if !probed_source_ids.is_empty() {
+        for node in &mut nodes {
+            if !probed_source_ids.contains(&node.id) {
+                continue;
+            }
+
+            let peaks_missing = node.peak_left_hint.unwrap_or(0.0) <= 0.0
+                && node.peak_right_hint.unwrap_or(0.0) <= 0.0;
+
+            if !peaks_missing {
+                continue;
+            }
+
+            if let Some((left, right)) = probe_source_levels(node.id, node.channels_hint) {
+                node.peak_left_hint = Some(left);
+                node.peak_right_hint = Some(right);
+            }
+        }
+    }
 
     debug!("node_discovery: collected {} nodes", nodes.len());
 
