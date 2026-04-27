@@ -103,7 +103,7 @@ impl NaluminaApp {
     ) -> bool {
         let mut changed = false;
         ui.vertical(|ui| {
-            let desired_size = egui::vec2(width.max(160.0), 18.0);
+            let desired_size = egui::vec2(width.max(136.0), 14.0);
             let (rect, response) =
                 ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
@@ -186,18 +186,15 @@ impl NaluminaApp {
                 rounding,
                 egui::Stroke::new(1.0, egui::Color32::from_rgb(68, 80, 100)),
             );
-
-            ui.add_space(2.0);
-            ui.label(egui::RichText::new(Self::format_db(live_db)).small());
         });
 
         changed
     }
 
     fn render_avatar(ui: &mut egui::Ui, label: &str) {
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(64.0, 64.0), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
         let painter = ui.painter_at(rect);
-        let rounding = egui::Rounding::same(10.0);
+        let rounding = egui::Rounding::same(6.0);
 
         painter.rect_filled(rect, rounding, egui::Color32::from_rgb(25, 31, 42));
         painter.rect_stroke(
@@ -210,7 +207,7 @@ impl NaluminaApp {
             rect.center(),
             egui::Align2::CENTER_CENTER,
             label,
-            egui::FontId::proportional(20.0),
+            egui::FontId::proportional(12.0),
             egui::Color32::from_rgb(230, 236, 245),
         );
     }
@@ -434,7 +431,6 @@ impl NaluminaApp {
                 for channel in &visible_channels {
                     let channel_id = channel.id;
                     let source_node_id = channel.source_node_id;
-                    let source_label = self.source_label(source_node_id);
                     let avatar = Self::avatar_label(&channel.name);
 
                     let mut channel_name = channel.name.clone();
@@ -452,115 +448,72 @@ impl NaluminaApp {
                     egui::Frame::none()
                         .fill(egui::Color32::from_rgb(20, 26, 38))
                         .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
-                        .rounding(egui::Rounding::same(8.0))
-                        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::symmetric(3.0, 2.0))
                         .show(ui, |ui| {
-                            ui.horizontal(|ui| {
-                                Self::render_avatar(ui, &avatar);
-                                ui.add_space(8.0);
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(360.0, 70.0),
+                                egui::Layout::top_down(egui::Align::Min),
+                                |ui| {
+                                    ui.set_width(360.0);
 
-                                ui.vertical(|ui| {
-                                    let name_response = ui.add_sized(
-                                        [220.0, 22.0],
-                                        egui::TextEdit::singleline(&mut channel_name)
-                                            .hint_text(self.i18n.text("ui.placeholder.input_name")),
-                                    );
+                                    ui.horizontal(|ui| {
+                                        Self::render_avatar(ui, &avatar);
+                                        ui.add_space(3.0);
 
-                                    if name_response.changed() {
-                                        let final_name = if channel_name.trim().is_empty() {
-                                            self.i18n.text_with(
-                                                "ui.input.default_name",
-                                                &[("index", channel_id.to_string())],
-                                            )
-                                        } else {
-                                            channel_name.trim().to_string()
-                                        };
+                                        ui.vertical(|ui| {
+                                            ui.add_sized(
+                                                [94.0, 16.0],
+                                                egui::TextEdit::singleline(&mut channel_name)
+                                                    .hint_text(
+                                                        self.i18n.text("ui.placeholder.input_name"),
+                                                    ),
+                                            );
+                                        });
 
-                                        if let Some(entry) = self
-                                            .input_channels
-                                            .iter_mut()
-                                            .find(|entry| entry.id == channel_id)
-                                        {
-                                            entry.name = final_name;
+                                        ui.add_space(3.0);
+
+                                        let mute_button = egui::Button::new("M")
+                                            .min_size(egui::vec2(16.0, 16.0))
+                                            .fill(if state.muted {
+                                                egui::Color32::from_rgb(166, 44, 44)
+                                            } else {
+                                                egui::Color32::from_rgb(46, 56, 74)
+                                            });
+
+                                        if ui.add(mute_button).clicked() {
+                                            state.muted = !state.muted;
+                                            changed = true;
                                         }
-                                    }
 
-                                    ui.add_space(2.0);
-                                    ui.label(
-                                        egui::RichText::new(source_label.clone()).small().weak(),
-                                    );
-                                });
+                                        ui.add_space(3.0);
 
-                                ui.with_layout(
-                                    egui::Layout::right_to_left(egui::Align::Center),
-                                    |ui| {
-                                        if ui.small_button("FX").clicked() {
-                                            // placeholder for future filter panel
-                                        }
-                                    },
-                                );
-                            });
+                                        ui.vertical(|ui| {
+                                            let mut level_db = Self::gain_to_db(state.level);
+                                            let slider_width = 152.0;
+                                            if Self::render_compact_fader(
+                                                ui,
+                                                &mut level_db,
+                                                live_level,
+                                                peak_level,
+                                                slider_width,
+                                            ) {
+                                                state.level = Self::db_to_gain(level_db);
+                                                changed = true;
+                                            }
+                                        });
 
-                            ui.add_space(6.0);
-                            ui.horizontal(|ui| {
-                                ui.add_space(72.0);
-                                ui.vertical(|ui| {
-                                    let mut level_db = Self::gain_to_db(state.level);
-                                    let slider_width = ui.available_width().max(220.0);
-                                    if Self::render_compact_fader(
-                                        ui,
-                                        &mut level_db,
-                                        live_level,
-                                        peak_level,
-                                        slider_width,
-                                    ) {
-                                        state.level = Self::db_to_gain(level_db);
-                                        changed = true;
-                                    }
-                                });
-                            });
-
-                            ui.add_space(4.0);
-                            egui::ComboBox::from_id_source(format!("source_combo_{}", channel_id))
-                                .selected_text(source_label)
-                                .width(220.0)
-                                .show_ui(ui, |ui| {
-                                    let mut selected = source_node_id;
-                                    if ui
-                                        .selectable_label(
-                                            selected.is_none(),
-                                            self.i18n.text("ui.device.unassigned"),
-                                        )
-                                        .clicked()
-                                    {
-                                        selected = None;
-                                    }
-
-                                    for node in &self.nodes {
-                                        if ui
-                                            .selectable_label(
-                                                selected == Some(node.id),
-                                                format!("#{} {}", node.id, node.name),
-                                            )
-                                            .clicked()
-                                        {
-                                            selected = Some(node.id);
-                                        }
-                                    }
-
-                                    if selected != source_node_id {
-                                        if let Some(entry) = self
-                                            .input_channels
-                                            .iter_mut()
-                                            .find(|entry| entry.id == channel_id)
-                                        {
-                                            entry.source_node_id = selected;
-                                        }
-                                        self.ensure_input_channel_defaults(channel_id, selected);
-                                        self.sync_live_meter_sources();
-                                        changed = true;
-                                    }
-                                });
+                                        ui.with_layout(
+                                            egui::Layout::right_to_left(egui::Align::Center),
+                                            |ui| {
+                                                if ui.small_button("FX").clicked() {
+                                                    // placeholder for future filter panel
+                                                }
+                                            },
+                                        );
+                                    });
+                                },
+                            );
 
                             if changed {
                                 self.channel_state.store(channel_id, state);

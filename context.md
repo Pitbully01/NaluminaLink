@@ -146,6 +146,13 @@ Current status:
 - refresh flow uses background worker + polling with typed result/error handling
 - CLI remains a debug and automation companion
 
+Current UI decision:
+
+- compact channel cards should stay around 360x70
+- visible order inside each card is image, name, mute button, fader, FX
+- the mute button is functional and must affect the channel mix state
+- keep the strip visually small and avoid re-expanding it with extra controls
+
 ---
 
 ## Current Code Layout

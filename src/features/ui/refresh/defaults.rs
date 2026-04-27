@@ -43,6 +43,7 @@ impl NaluminaApp {
     ) -> ChannelStripState {
         ChannelStripState {
             level: Self::clamped_level(level_hint),
+            muted: false,
             sends: Self::default_sends(mix_bus_count),
             output_mutes: Self::default_output_mutes(mix_bus_count),
         }
