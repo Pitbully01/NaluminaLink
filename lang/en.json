@@ -25,6 +25,7 @@
   "ui.label.status": "Status",
   "ui.label.channels": "Channels",
   "ui.label.input_channels": "Input channels",
+  "ui.label.input_monitor": "Input monitor",
   "ui.label.node_filter": "Node filter",
   "ui.label.visible_channels": "Visible channels",
   "ui.label.mix_outputs_count": "Mix outputs",

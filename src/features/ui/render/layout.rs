@@ -8,6 +8,7 @@ const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 const FADER_DB_MIN: f32 = -60.0;
 const FADER_DB_MAX: f32 = 12.0;
 const MUTE_DB_EPSILON: f32 = 0.001;
+const FADER_DB_TICKS: [f32; 8] = [-60.0, -30.0, -20.0, -10.0, -5.0, 0.0, 6.0, 12.0];
 
 impl NaluminaApp {
     fn gain_to_db(gain: f32) -> f32 {
@@ -32,6 +33,50 @@ impl NaluminaApp {
         } else {
             format!("{db:.1} dB")
         }
+    }
+
+    fn render_db_ticks(ui: &mut egui::Ui) {
+        let ticks = FADER_DB_TICKS
+            .iter()
+            .map(|tick| {
+                if *tick > 0.0 {
+                    format!("+{tick:.0}")
+                } else {
+                    format!("{tick:.0}")
+                }
+            })
+            .collect::<Vec<String>>()
+            .join("  ");
+        ui.label(egui::RichText::new(ticks).small().weak());
+    }
+
+    fn source_live_levels(&self, source_node_id: Option<u32>) -> (f32, f32) {
+        let Some(node_id) = source_node_id else {
+            return (0.0, 0.0);
+        };
+
+        let Some(node) = self.nodes.iter().find(|node| node.id == node_id) else {
+            return (0.0, 0.0);
+        };
+
+        let fallback = node.volume_hint.unwrap_or(0.0).clamp(0.0, 1.0);
+        let left = node.peak_left_hint.unwrap_or(fallback).clamp(0.0, 1.0);
+        let right = node.peak_right_hint.unwrap_or(left).clamp(0.0, 1.0);
+        (left, right)
+    }
+
+    fn render_input_monitor_fader(ui: &mut egui::Ui, label: &str, gain: f32) {
+        let mut db = Self::gain_to_db(gain);
+        ui.horizontal(|ui| {
+            ui.label(egui::RichText::new(label).small().strong());
+            let _ = ui.add_enabled(
+                false,
+                egui::Slider::new(&mut db, FADER_DB_MIN..=FADER_DB_MAX)
+                    .show_value(false)
+                    .trailing_fill(true),
+            );
+            ui.label(egui::RichText::new(Self::format_db(db)).small());
+        });
     }
 
     fn meter_zone_color(level: f32) -> egui::Color32 {
@@ -310,6 +355,7 @@ impl NaluminaApp {
                             let mut channel_name = channel.name.clone();
                             let source_label = self.source_label(source_node_id);
                             let layout_label = self.source_layout_label(source_node_id);
+                            let (live_left, live_right) = self.source_live_levels(source_node_id);
 
                             let mut state = self.channel_state.load_or_default(
                                 channel_id,
@@ -413,6 +459,16 @@ impl NaluminaApp {
                                     state.level = Self::db_to_gain(level_db);
                                     changed = true;
                                 }
+
+                                ui.label(
+                                    egui::RichText::new(self.i18n.text("ui.label.input_monitor"))
+                                        .small(),
+                                );
+                                Self::render_input_monitor_fader(ui, "L", live_left);
+                                if layout_label == self.i18n.text("ui.layout.stereo") {
+                                    Self::render_input_monitor_fader(ui, "R", live_right);
+                                }
+                                Self::render_db_ticks(ui);
 
                                 ui.label(
                                     egui::RichText::new(self.i18n.text_with(

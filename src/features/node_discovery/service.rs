@@ -32,6 +32,15 @@ fn parse_channels_hint(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<
     })
 }
 
+fn parse_peak_hint(props: Option<&pw::spa::utils::dict::DictRef>, keys: &[&str]) -> Option<f32> {
+    keys.iter().find_map(|key| {
+        props
+            .and_then(|properties| properties.get(key))
+            .and_then(|raw| raw.trim().parse::<f32>().ok())
+            .map(|value| value.clamp(0.0, 1.0))
+    })
+}
+
 fn ensure_pipewire_init() {
     PIPEWIRE_INIT.call_once(|| {
         debug!("node_discovery: process-wide pipewire init");
@@ -91,6 +100,14 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                     .unwrap_or("");
                 let volume_hint = parse_volume_hint(props);
                 let channels_hint = parse_channels_hint(props);
+                let peak_left_hint = parse_peak_hint(
+                    props,
+                    &["audio.peak.left", "peak.left", "peak.l", "meter.left"],
+                );
+                let peak_right_hint = parse_peak_hint(
+                    props,
+                    &["audio.peak.right", "peak.right", "peak.r", "meter.right"],
+                );
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,
@@ -98,6 +115,8 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                     description: node_description.to_string(),
                     volume_hint,
                     channels_hint,
+                    peak_left_hint,
+                    peak_right_hint,
                 });
             })
             .global_remove(|_global_id| {})
