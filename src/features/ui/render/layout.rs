@@ -8,9 +8,6 @@ const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 const FADER_DB_MIN: f32 = -60.0;
 const FADER_DB_MAX: f32 = 0.0;
 const MUTE_DB_EPSILON: f32 = 0.001;
-const FADER_DB_TICKS: [f32; 11] = [
-    -60.0, -54.0, -48.0, -42.0, -36.0, -30.0, -24.0, -18.0, -12.0, -6.0, 0.0,
-];
 
 impl NaluminaApp {
     fn gain_to_db(gain: f32) -> f32 {
@@ -19,6 +16,59 @@ impl NaluminaApp {
         } else {
             (20.0 * gain.log10()).clamp(FADER_DB_MIN, FADER_DB_MAX)
         }
+    }
+
+    fn render_node_browser(&self, ui: &mut egui::Ui) {
+        section_header(
+            ui,
+            self.i18n.text("ui.section.node_browser"),
+            self.i18n.text("ui.section.node_browser_subtitle"),
+        );
+
+        egui::ScrollArea::vertical()
+            .id_source("node_browser")
+            .max_height(210.0)
+            .show(ui, |ui| {
+                let visible_nodes = self.nodes.clone();
+                for node in &visible_nodes {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.strong(format!("#{}", node.id));
+                        ui.label(&node.name);
+                        if let Some(ch) = node.channels_hint {
+                            ui.label(
+                                egui::RichText::new(
+                                    self.i18n.text_with(
+                                        "ui.node.channels",
+                                        &[("count", ch.to_string())],
+                                    ),
+                                )
+                                .small(),
+                            );
+                        }
+                        if !node.description.is_empty() {
+                            ui.label(
+                                egui::RichText::new(self.i18n.text_with(
+                                    "ui.node.description_format",
+                                    &[("description", node.description.clone())],
+                                ))
+                                .small(),
+                            );
+                        }
+                    });
+                    ui.separator();
+                }
+
+                ui.label(
+                    egui::RichText::new(self.i18n.text_with(
+                        "ui.nodes.visible_count",
+                        &[
+                            ("shown", visible_nodes.len().to_string()),
+                            ("total", self.nodes.len().to_string()),
+                        ],
+                    ))
+                    .small(),
+                );
+            });
     }
 
     fn db_to_gain(db: f32) -> f32 {
@@ -103,7 +153,7 @@ impl NaluminaApp {
     ) -> bool {
         let mut changed = false;
         ui.vertical(|ui| {
-            let desired_size = egui::vec2(width.max(136.0), 14.0);
+            let desired_size = egui::vec2(width.max(132.0), 12.0);
             let (rect, response) =
                 ui.allocate_exact_size(desired_size, egui::Sense::click_and_drag());
 
@@ -121,17 +171,9 @@ impl NaluminaApp {
             }
 
             let painter = ui.painter_at(rect);
-            let rounding = egui::Rounding::same(5.0);
+            let rounding = egui::Rounding::same(4.0);
 
-            painter.rect_filled(rect, rounding, egui::Color32::from_rgb(18, 22, 30));
-
-            painter.line_segment(
-                [
-                    egui::pos2(rect.left(), rect.center().y),
-                    egui::pos2(rect.right(), rect.center().y),
-                ],
-                egui::Stroke::new(1.0, egui::Color32::from_rgb(0, 0, 0)),
-            );
+            painter.rect_filled(rect, rounding, egui::Color32::from_rgb(39, 46, 54));
 
             let live_db = Self::gain_to_db(live_level.clamp(0.0, 1.0));
             let live = Self::db_to_meter_pos(live_db);
@@ -139,52 +181,40 @@ impl NaluminaApp {
                 rect.left_top(),
                 egui::pos2(rect.left() + rect.width() * live, rect.bottom()),
             );
-            painter.rect_filled(
-                live_rect,
-                rounding,
-                Self::meter_fill_color_db(live_db).linear_multiply(0.78),
+            painter.rect_filled(live_rect, rounding, egui::Color32::from_rgb(52, 170, 105));
+
+            let level = Self::db_to_meter_pos(*level_db);
+            let level_rect = egui::Rect::from_min_max(
+                rect.left_top(),
+                egui::pos2(rect.left() + rect.width() * level, rect.bottom()),
             );
+            painter.rect_filled(level_rect, rounding, egui::Color32::from_rgb(63, 224, 124));
 
             let peak_db = Self::gain_to_db(peak_level.clamp(0.0, 1.0));
             let peak = Self::db_to_meter_pos(peak_db);
             let peak_x = rect.left() + rect.width() * peak;
             painter.line_segment(
                 [
-                    egui::pos2(peak_x, rect.top() - 2.0),
-                    egui::pos2(peak_x, rect.bottom() + 2.0),
+                    egui::pos2(peak_x, rect.top()),
+                    egui::pos2(peak_x, rect.bottom()),
                 ],
-                egui::Stroke::new(1.5, egui::Color32::from_rgb(255, 208, 72)),
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(210, 240, 222)),
             );
 
-            for tick in FADER_DB_TICKS {
-                let x = rect.left() + rect.width() * Self::db_to_meter_pos(tick);
-                painter.line_segment(
-                    [egui::pos2(x, rect.top()), egui::pos2(x, rect.bottom())],
-                    egui::Stroke::new(
-                        0.5,
-                        egui::Color32::from_rgba_unmultiplied(255, 255, 255, 30),
-                    ),
-                );
-            }
-
-            let handle_x = rect.left() + rect.width() * Self::db_to_meter_pos(*level_db);
+            let handle_x = rect.left() + rect.width() * level;
             let handle_center = egui::pos2(handle_x, rect.center().y);
             let handle_color = if response.dragged() {
-                egui::Color32::from_rgb(219, 227, 244)
+                egui::Color32::from_rgb(236, 242, 248)
             } else {
-                egui::Color32::from_rgb(189, 199, 220)
+                egui::Color32::from_rgb(216, 224, 235)
             };
-            painter.circle_filled(handle_center, 6.0, handle_color);
-            painter.circle_stroke(
-                handle_center,
-                6.0,
-                egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 82, 106)),
-            );
+            painter.circle_filled(handle_center, 3.0, handle_color);
+            painter.circle_stroke(handle_center, 3.0, egui::Stroke::new(1.0, egui::Color32::from_rgb(85, 95, 112)));
 
             painter.rect_stroke(
                 rect,
                 rounding,
-                egui::Stroke::new(1.0, egui::Color32::from_rgb(68, 80, 100)),
+                egui::Stroke::new(1.0, egui::Color32::from_rgb(62, 74, 92)),
             );
         });
 
@@ -192,23 +222,19 @@ impl NaluminaApp {
     }
 
     fn render_avatar(ui: &mut egui::Ui, label: &str) {
-        let (rect, _) = ui.allocate_exact_size(egui::vec2(28.0, 28.0), egui::Sense::hover());
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(20.0, 20.0), egui::Sense::hover());
         let painter = ui.painter_at(rect);
-        let rounding = egui::Rounding::same(6.0);
+        let rounding = egui::Rounding::same(4.0);
 
-        painter.rect_filled(rect, rounding, egui::Color32::from_rgb(25, 31, 42));
-        painter.rect_stroke(
-            rect,
-            rounding,
-            egui::Stroke::new(1.0, egui::Color32::from_rgb(76, 87, 108)),
-        );
+        painter.rect_filled(rect, rounding, egui::Color32::from_rgb(231, 236, 242));
+        painter.rect_stroke(rect, rounding, egui::Stroke::new(1.0, egui::Color32::from_rgb(130, 141, 161)));
 
         painter.text(
             rect.center(),
             egui::Align2::CENTER_CENTER,
             label,
-            egui::FontId::proportional(12.0),
-            egui::Color32::from_rgb(230, 236, 245),
+            egui::FontId::proportional(10.0),
+            egui::Color32::from_rgb(42, 50, 66),
         );
     }
 
@@ -432,8 +458,8 @@ impl NaluminaApp {
                     let channel_id = channel.id;
                     let source_node_id = channel.source_node_id;
                     let avatar = Self::avatar_label(&channel.name);
+                    let source_label = self.source_label(source_node_id);
 
-                    let mut channel_name = channel.name.clone();
                     let mut state = self.channel_state.load_or_default(
                         channel_id,
                         Self::default_channel_state(
@@ -444,83 +470,101 @@ impl NaluminaApp {
                     let mut changed = false;
                     let live_level = self.source_live_level(source_node_id);
                     let peak_level = self.source_peak_level(source_node_id);
+                    let card_size = egui::vec2(360.0, 70.0);
+                    let inner_size = egui::vec2(356.0, 66.0);
 
-                    egui::Frame::none()
-                        .fill(egui::Color32::from_rgb(20, 26, 38))
-                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
-                        .rounding(egui::Rounding::same(7.0))
-                        .inner_margin(egui::Margin::symmetric(3.0, 2.0))
-                        .show(ui, |ui| {
-                            ui.allocate_ui_with_layout(
-                                egui::vec2(360.0, 70.0),
-                                egui::Layout::top_down(egui::Align::Min),
-                                |ui| {
-                                    ui.set_width(360.0);
+                    ui.allocate_ui_with_layout(
+                        card_size,
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.set_min_size(card_size);
+                            ui.set_max_size(card_size);
 
-                                    ui.horizontal(|ui| {
-                                        Self::render_avatar(ui, &avatar);
-                                        ui.add_space(3.0);
+                            egui::Frame::none()
+                                .fill(egui::Color32::from_rgb(28, 35, 44))
+                                .stroke(egui::Stroke::new(
+                                    1.0,
+                                    egui::Color32::from_rgb(66, 82, 103),
+                                ))
+                                .rounding(egui::Rounding::same(6.0))
+                                .inner_margin(egui::Margin::symmetric(2.0, 1.0))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(inner_size);
+                                    ui.set_max_size(inner_size);
 
-                                        ui.vertical(|ui| {
-                                            ui.add_sized(
-                                                [94.0, 16.0],
-                                                egui::TextEdit::singleline(&mut channel_name)
-                                                    .hint_text(
-                                                        self.i18n.text("ui.placeholder.input_name"),
-                                                    ),
-                                            );
-                                        });
+                                    ui.with_layout(
+                                        egui::Layout::left_to_right(egui::Align::Center),
+                                        |ui| {
+                                            Self::render_avatar(ui, &avatar);
+                                            ui.add_space(4.0);
 
-                                        ui.add_space(3.0);
-
-                                        let mute_button = egui::Button::new("M")
-                                            .min_size(egui::vec2(16.0, 16.0))
-                                            .fill(if state.muted {
-                                                egui::Color32::from_rgb(166, 44, 44)
-                                            } else {
-                                                egui::Color32::from_rgb(46, 56, 74)
+                                            ui.vertical(|ui| {
+                                                ui.label(
+                                                    egui::RichText::new(&channel.name)
+                                                        .size(13.0)
+                                                        .strong(),
+                                                );
+                                                ui.label(
+                                                    egui::RichText::new(source_label.clone())
+                                                        .size(11.0)
+                                                        .color(egui::Color32::from_rgb(155, 170, 188)),
+                                                );
                                             });
 
-                                        if ui.add(mute_button).clicked() {
-                                            state.muted = !state.muted;
-                                            changed = true;
-                                        }
+                                            ui.add_space(6.0);
 
-                                        ui.add_space(3.0);
+                                            let mute_button = egui::Button::new(if state.muted { "MUT" } else { "SPK" })
+                                                .min_size(egui::vec2(28.0, 16.0))
+                                                .fill(if state.muted {
+                                                    egui::Color32::from_rgb(166, 44, 44)
+                                                } else {
+                                                    egui::Color32::from_rgb(49, 62, 81)
+                                                });
 
-                                        ui.vertical(|ui| {
-                                            let mut level_db = Self::gain_to_db(state.level);
-                                            let slider_width = 152.0;
-                                            if Self::render_compact_fader(
-                                                ui,
-                                                &mut level_db,
-                                                live_level,
-                                                peak_level,
-                                                slider_width,
-                                            ) {
-                                                state.level = Self::db_to_gain(level_db);
+                                            if ui.add(mute_button).clicked() {
+                                                state.muted = !state.muted;
                                                 changed = true;
                                             }
-                                        });
 
-                                        ui.with_layout(
-                                            egui::Layout::right_to_left(egui::Align::Center),
-                                            |ui| {
-                                                if ui.small_button("FX").clicked() {
-                                                    // placeholder for future filter panel
+                                            ui.add_space(6.0);
+
+                                            ui.vertical(|ui| {
+                                                let mut level_db = Self::gain_to_db(state.level);
+                                                let slider_width = 132.0;
+                                                if Self::render_compact_fader(
+                                                    ui,
+                                                    &mut level_db,
+                                                    live_level,
+                                                    peak_level,
+                                                    slider_width,
+                                                ) {
+                                                    state.level = Self::db_to_gain(level_db);
+                                                    changed = true;
                                                 }
-                                            },
-                                        );
-                                    });
-                                },
-                            );
+                                            });
 
-                            if changed {
-                                self.channel_state.store(channel_id, state);
-                            }
-                        });
+                                            ui.with_layout(
+                                                egui::Layout::right_to_left(egui::Align::Center),
+                                                |ui| {
+                                                    let fx_button = egui::Button::new("FX")
+                                                        .min_size(egui::vec2(26.0, 16.0))
+                                                        .fill(egui::Color32::from_rgb(58, 67, 82));
+                                                    if ui.add(fx_button).clicked() {
+                                                        // placeholder for future filter panel
+                                                    }
+                                                },
+                                            );
+                                        },
+                                    );
+                                });
+                        },
+                    );
 
-                    ui.add_space(8.0);
+                    if changed {
+                        self.channel_state.store(channel_id, state);
+                    }
+
+                    ui.add_space(6.0);
                 }
             });
     }
@@ -533,68 +577,52 @@ impl NaluminaApp {
         );
         ui.add_space(8.0);
 
-        for (bus_index, level) in mix_levels.buses.iter().enumerate() {
-            if bus_index > 0 {
-                ui.add_space(6.0);
-            }
-
-            ui.label(egui::RichText::new(self.mix_bus_label(bus_index)).strong());
-            ui.label(egui::RichText::new(Self::format_db(Self::gain_to_db(*level))).small());
-            percent_progress_bar(ui, *level, 220.0, Self::meter_zone_color(*level));
-        }
-    }
-
-    fn render_node_browser(&self, ui: &mut egui::Ui) {
-        section_header(
-            ui,
-            self.i18n.text("ui.section.node_browser"),
-            self.i18n.text("ui.section.node_browser_subtitle"),
-        );
-
         egui::ScrollArea::vertical()
-            .id_source("node_browser")
-            .max_height(210.0)
+            .id_source("mix_outputs")
+            .max_height(280.0)
             .show(ui, |ui| {
-                let visible_nodes = self.nodes.clone();
-                for node in &visible_nodes {
-                    ui.horizontal_wrapped(|ui| {
-                        ui.strong(format!("#{}", node.id));
-                        ui.label(&node.name);
-                        if let Some(ch) = node.channels_hint {
-                            ui.label(
-                                egui::RichText::new(
-                                    self.i18n.text_with(
-                                        "ui.node.channels",
-                                        &[("count", ch.to_string())],
-                                    ),
-                                )
-                                .small(),
-                            );
-                        }
-                        if !node.description.is_empty() {
-                            ui.label(
-                                egui::RichText::new(self.i18n.text_with(
-                                    "ui.node.description_format",
-                                    &[("description", node.description.clone())],
-                                ))
-                                .small(),
-                            );
-                        }
-                    });
-                    ui.separator();
-                }
+                for (bus_index, level) in mix_levels.buses.iter().enumerate() {
+                    let bus_name = self.mix_bus_label(bus_index);
+                    let avatar = Self::avatar_label(&bus_name);
 
-                ui.label(
-                    egui::RichText::new(self.i18n.text_with(
-                        "ui.nodes.visible_count",
-                        &[
-                            ("shown", visible_nodes.len().to_string()),
-                            ("total", self.nodes.len().to_string()),
-                        ],
-                    ))
-                    .small(),
-                );
+                    let card_size = egui::vec2(360.0, 70.0);
+                    let inner_size = egui::vec2(356.0, 66.0);
+
+                    ui.allocate_ui_with_layout(card_size, egui::Layout::top_down(egui::Align::Min), |ui| {
+                        ui.set_min_size(card_size);
+                        ui.set_max_size(card_size);
+
+                        egui::Frame::none()
+                            .fill(egui::Color32::from_rgb(20, 26, 38))
+                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(50, 65, 92)))
+                            .rounding(egui::Rounding::same(6.0))
+                            .inner_margin(egui::Margin::symmetric(2.0, 1.0))
+                            .show(ui, |ui| {
+                                ui.set_min_size(inner_size);
+                                ui.set_max_size(inner_size);
+
+                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
+                                    Self::render_avatar(ui, &avatar);
+                                    ui.add_space(4.0);
+
+                                    ui.vertical(|ui| {
+                                        ui.label(egui::RichText::new(bus_name).size(13.0).strong());
+                                        ui.label(
+                                            egui::RichText::new(Self::format_db(Self::gain_to_db(*level)))
+                                                .size(11.0),
+                                        );
+                                    });
+
+                                    ui.add_space(6.0);
+                                    percent_progress_bar(ui, *level, 170.0, Self::meter_zone_color(*level));
+                                });
+                            });
+                    });
+                    ui.add_space(6.0);
+                }
             });
+
+        // node browser moved to its own method for clarity
     }
 
     fn render_scene_summary(&self, ui: &mut egui::Ui, mix_levels: &MixLevels) {

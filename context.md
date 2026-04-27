@@ -150,6 +150,8 @@ Current UI decision:
 
 - compact channel cards should stay around 360x70
 - visible order inside each card is image, name, mute button, fader, FX
+- output buses should also use compact 360x70 cards in the second matrix area
+- input cards should use a Wave-Link-like compact visual style: two-line labels, compact speaker-style mute control, and simple green slider track
 - the mute button is functional and must affect the channel mix state
 - keep the strip visually small and avoid re-expanding it with extra controls
 
