@@ -175,20 +175,22 @@ impl NaluminaApp {
 
             painter.rect_filled(rect, rounding, egui::Color32::from_rgb(34, 40, 46));
 
+            // draw live level as a thin overlay bar
             let live_db = Self::gain_to_db(live_level.clamp(0.0, 1.0));
             let live = Self::db_to_meter_pos(live_db);
-            let live_rect = egui::Rect::from_min_max(
-                rect.left_top(),
-                egui::pos2(rect.left() + rect.width() * live, rect.bottom()),
+            let bar_h = rect.height().min(6.0);
+            let live_bar = egui::Rect::from_min_max(
+                egui::pos2(rect.left(), rect.center().y - bar_h / 2.0),
+                egui::pos2(
+                    rect.left() + rect.width() * live,
+                    rect.center().y + bar_h / 2.0,
+                ),
             );
-            painter.rect_filled(live_rect, rounding, egui::Color32::from_rgb(46, 197, 105));
-
-            let level = Self::db_to_meter_pos(*level_db);
-            let level_rect = egui::Rect::from_min_max(
-                rect.left_top(),
-                egui::pos2(rect.left() + rect.width() * level, rect.bottom()),
+            painter.rect_filled(
+                live_bar,
+                egui::Rounding::same(3.0),
+                egui::Color32::from_rgba_unmultiplied(46, 197, 105, 220),
             );
-            painter.rect_filled(level_rect, rounding, egui::Color32::from_rgb(78, 214, 120));
 
             let peak_db = Self::gain_to_db(peak_level.clamp(0.0, 1.0));
             let peak = Self::db_to_meter_pos(peak_db);
@@ -201,7 +203,7 @@ impl NaluminaApp {
                 egui::Stroke::new(1.0, egui::Color32::from_rgb(210, 240, 222)),
             );
 
-            let handle_x = rect.left() + rect.width() * level;
+            let handle_x = rect.left() + rect.width() * Self::db_to_meter_pos(*level_db);
             let handle_center = egui::pos2(handle_x, rect.center().y);
             let handle_color = if response.dragged() {
                 egui::Color32::from_rgb(236, 242, 248)
@@ -284,6 +286,19 @@ impl NaluminaApp {
             "?".to_string()
         } else {
             letters.to_uppercase()
+        }
+    }
+
+    fn truncate_label(s: &str, max_len: usize) -> String {
+        if s.len() <= max_len {
+            s.to_string()
+        } else {
+            let mut out = s
+                .chars()
+                .take(max_len.saturating_sub(1))
+                .collect::<String>();
+            out.push('…');
+            out
         }
     }
 
@@ -539,13 +554,35 @@ impl NaluminaApp {
                                                         .size(12.0)
                                                         .strong(),
                                                 );
-                                                ui.label(
-                                                    egui::RichText::new(source_label.clone())
-                                                        .size(10.0)
-                                                        .color(egui::Color32::from_rgb(
-                                                            155, 170, 188,
-                                                        )),
-                                                );
+                                                // source selection menu (click to assign a node)
+                                                let menu_label = Self::truncate_label(&source_label, 28);
+                                                ui.with_layout(egui::Layout::left_to_right(egui::Align::Min), |ui| {
+                                                    ui.add_space(0.0);
+                                                    let nodes = self.nodes.clone();
+                                                    ui.menu_button(
+                                                        egui::RichText::new(menu_label).size(10.0).color(egui::Color32::from_rgb(155, 170, 188)),
+                                                        |ui| {
+                                                            for node in &nodes {
+                                                                if ui.button(&node.name).clicked() {
+                                                                    if let Some(ch) = self.input_channels.iter_mut().find(|c| c.id == channel_id) {
+                                                                        ch.source_node_id = Some(node.id);
+                                                                        // update meter sources
+                                                                        self.sync_live_meter_sources();
+                                                                    }
+                                                                    ui.close_menu();
+                                                                }
+                                                            }
+
+                                                            if ui.button(self.i18n.text("ui.device.unassigned")).clicked() {
+                                                                if let Some(ch) = self.input_channels.iter_mut().find(|c| c.id == channel_id) {
+                                                                    ch.source_node_id = None;
+                                                                    self.sync_live_meter_sources();
+                                                                }
+                                                                ui.close_menu();
+                                                            }
+                                                        },
+                                                    );
+                                                });
                                                 ui.add_space(4.0);
                                                 let (live_left, live_right) =
                                                     self.source_live_levels(source_node_id);
