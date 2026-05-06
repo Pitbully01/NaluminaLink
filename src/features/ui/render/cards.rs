@@ -251,20 +251,24 @@ pub(in crate::features::ui) fn render_mix_matrix(
                 .id_source("mix_matrix")
                 .max_height(540.0)
                 .show(ui, |ui| {
+                    // HEADER ROW: Bus headers + add button
                     ui.horizontal(|ui| {
-                        ui.add_space(MATRIX_ROW_LABEL_WIDTH + 14.0);
+                        ui.add_space(MATRIX_ROW_LABEL_WIDTH);
+                        
                         for bus_index in 0..app.mix_bus_count {
                             render_matrix_bus_header(ui, &app.mix_bus_label(bus_index));
                             ui.add_space(8.0);
                         }
 
-                        // Add new mix bus button (if under limit)
+                        // Add new mix bus button
                         if app.mix_bus_count < crate::features::ui::state::MAX_MIX_BUS_COUNT {
                             if ui
-                                .button(egui::RichText::new("+ Ausgang")
-                                    .size(11.0)
-                                    .strong()
-                                    .color(egui::Color32::from_rgb(77, 208, 122)))
+                                .button(
+                                    egui::RichText::new("+")
+                                        .size(16.0)
+                                        .strong()
+                                        .color(egui::Color32::from_rgb(77, 208, 122)),
+                                )
                                 .clicked()
                             {
                                 app.mix_bus_count = (app.mix_bus_count + 1)
@@ -274,8 +278,9 @@ pub(in crate::features::ui) fn render_mix_matrix(
                         }
                     });
 
-                    ui.add_space(8.0);
+                    ui.add_space(12.0);
 
+                    // DATA ROWS: Each input channel + bridge cells
                     for channel in &visible_channels {
                         ui.horizontal(|ui| {
                             let source_node_id = channel.source_node_id;
@@ -291,6 +296,7 @@ pub(in crate::features::ui) fn render_mix_matrix(
                                 ),
                             );
 
+                            // LEFT COLUMN: Channel info
                             egui::Frame::none()
                                 .fill(egui::Color32::from_rgb(24, 31, 40))
                                 .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 76, 96)))
@@ -301,87 +307,100 @@ pub(in crate::features::ui) fn render_mix_matrix(
                                         MATRIX_ROW_LABEL_WIDTH,
                                         MATRIX_ROW_HEIGHT,
                                     ));
-                                    ui.horizontal(|ui| {
-                                        let avatar = avatar_label(&channel.name);
-                                        render_avatar(ui, &avatar);
-                                        ui.add_space(8.0);
-
-                                        ui.vertical(|ui| {
+                                    ui.vertical(|ui| {
+                                        ui.horizontal(|ui| {
+                                            let avatar = avatar_label(&channel.name);
+                                            render_avatar(ui, &avatar);
+                                            ui.add_space(6.0);
                                             ui.label(
                                                 egui::RichText::new(&channel.name)
-                                                    .size(12.0)
+                                                    .size(11.0)
                                                     .strong(),
                                             );
-                                            render_source_picker(
-                                                app,
-                                                ui,
-                                                channel.id,
-                                                &source_label,
-                                                node_choices,
-                                            );
-                                            ui.add_space(4.0);
-                                            let (live_left, live_right) =
-                                                app.source_live_levels(source_node_id);
-                                            render_lr_meter(ui, live_left, live_right);
                                         });
 
-                                        ui.add_space(12.0);
-
-                                        // Mute Button
-                                        let mute_color = if state.muted {
-                                            egui::Color32::from_rgb(255, 107, 107)
-                                        } else {
-                                            egui::Color32::from_rgb(110, 130, 160)
-                                        };
-                                        if ui.button(
-                                            egui::RichText::new("🔇")
-                                                .size(13.0)
-                                                .color(mute_color),
-                                        ).clicked() {
-                                            state.muted = !state.muted;
-                                        }
-
-                                        ui.add_space(6.0);
-
-                                        // FX Button
-                                        if ui.button(
-                                            egui::RichText::new("FX")
-                                                .size(10.0)
-                                                .strong()
-                                                .color(egui::Color32::from_rgb(155, 170, 188)),
-                                        ).clicked() {
-                                            // TODO: Open FX panel for this channel
-                                        }
-                                    });
-
-                                    if state.muted {
                                         ui.add_space(2.0);
-                                    }
+                                        render_source_picker(
+                                            app,
+                                            ui,
+                                            channel.id,
+                                            &source_label,
+                                            node_choices,
+                                        );
+                                        ui.add_space(2.0);
+                                        let (live_left, live_right) =
+                                            app.source_live_levels(source_node_id);
+                                        render_lr_meter(ui, live_left, live_right);
+
+                                        ui.add_space(4.0);
+
+                                        ui.horizontal(|ui| {
+                                            // Mute Button
+                                            let mute_color = if state.muted {
+                                                egui::Color32::from_rgb(255, 107, 107)
+                                            } else {
+                                                egui::Color32::from_rgb(110, 130, 160)
+                                            };
+                                            if ui
+                                                .button(
+                                                    egui::RichText::new("🔇")
+                                                        .size(11.0)
+                                                        .color(mute_color),
+                                                )
+                                                .clicked()
+                                            {
+                                                state.muted = !state.muted;
+                                            }
+
+                                            ui.add_space(4.0);
+
+                                            // FX Button
+                                            if ui
+                                                .button(
+                                                    egui::RichText::new("FX")
+                                                        .size(9.0)
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(155, 170, 188)),
+                                                )
+                                                .clicked()
+                                            {
+                                                // TODO: Open FX panel
+                                            }
+                                        });
+                                    });
                                 });
 
                             ui.add_space(8.0);
 
+                            // MATRIX CELLS: Bridge icons for each bus
                             for bus_index in 0..app.mix_bus_count {
-                                let mut send = state.sends.get(bus_index).copied().unwrap_or(
-                                    if bus_index == 0 {
-                                        crate::features::ui::state::DEFAULT_MONITOR_SEND
-                                    } else {
-                                        crate::features::ui::state::DEFAULT_STREAM_SEND
-                                    },
-                                );
-
-                                if render_matrix_send_cell(
-                                    ui,
-                                    &app.mix_bus_label(bus_index),
-                                    &mut send,
-                                    live_level,
-                                    peak_level,
-                                ) {
-                                    if bus_index >= state.sends.len() {
-                                        state.sends.resize(app.mix_bus_count, 0.0);
-                                    }
-                                    state.sends[bus_index] = send;
-                                }
+                                egui::Frame::none()
+                                    .fill(egui::Color32::from_rgb(27, 34, 43))
+                                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 72, 94)))
+                                    .rounding(egui::Rounding::same(6.0))
+                                    .inner_margin(egui::Margin::symmetric(8.0, 8.0))
+                                    .show(ui, |ui| {
+                                        ui.set_min_size(egui::vec2(MATRIX_BUS_COL_WIDTH, MATRIX_ROW_HEIGHT));
+                                        ui.vertical_centered(|ui| {
+                                            // Bridge/Link Icon
+                                            if ui
+                                                .button(
+                                                    egui::RichText::new("+")
+                                                        .size(20.0)
+                                                        .strong()
+                                                        .color(egui::Color32::from_rgb(77, 208, 122)),
+                                                )
+                                                .clicked()
+                                            {
+                                                // TODO: Create bridge link
+                                            }
+                                            ui.label(
+                                                egui::RichText::new("Bridge")
+                                                    .size(8.0)
+                                                    .color(egui::Color32::from_rgb(155, 170, 188)),
+                                            );
+                                        });
+                                    });
 
                                 ui.add_space(8.0);
                             }
@@ -389,17 +408,18 @@ pub(in crate::features::ui) fn render_mix_matrix(
                             app.channel_state.store(channel.id, state);
                         });
 
-                        ui.add_space(8.0);
+                        ui.add_space(12.0);
                     }
 
-                    // Add new input channel button
+                    // FOOTER ROW: Add input channel button
                     ui.horizontal(|ui| {
-                        ui.add_space(MATRIX_ROW_LABEL_WIDTH + 14.0);
                         if ui
-                            .button(egui::RichText::new("+ Eingang")
-                                .size(11.0)
-                                .strong()
-                                .color(egui::Color32::from_rgb(77, 208, 122)))
+                            .button(
+                                egui::RichText::new("+ Eingang")
+                                    .size(12.0)
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(77, 208, 122)),
+                            )
                             .clicked()
                         {
                             app.add_input_channel();
