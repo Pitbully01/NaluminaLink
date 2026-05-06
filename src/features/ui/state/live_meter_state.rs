@@ -1,12 +1,13 @@
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::{BufReader, Read};
+use std::process::{Child, Command, Stdio};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc, Mutex,
 };
 use std::thread::{self, JoinHandle};
-use std::time::{Duration, Instant};
 
-use crate::features::node_discovery::{sample_source_levels, NodeEntry};
+use crate::features::node_discovery::NodeEntry;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(in crate::features::ui) struct MeterLevels {
@@ -31,11 +32,6 @@ pub(in crate::features::ui) struct LiveMeterStore {
 }
 
 impl LiveMeterStore {
-    const POLL_INTERVAL: Duration = Duration::from_millis(16);
-    const ATTACK: f32 = 0.28;
-    const RELEASE: f32 = 0.08;
-    const PEAK_HOLD: Duration = Duration::from_secs(3);
-
     pub(in crate::features::ui) fn new() -> Self {
         Self {
             readings: Arc::new(Mutex::new(BTreeMap::new())),
@@ -64,57 +60,52 @@ impl LiveMeterStore {
         let stop = Arc::new(AtomicBool::new(false));
         let stop_flag = Arc::clone(&stop);
         let node_id = node.id;
-        let channels_hint = node.channels_hint;
+        let channels_hint = node.channels_hint.unwrap_or(2).clamp(1, 2);
+        let sample_frame_size = usize::from(channels_hint) * 2 * 128;
 
         let handle = thread::spawn(move || {
-            let mut smoothed = MeterLevels {
-                left: 0.0,
-                right: 0.0,
+            let mut child = match spawn_meter_process(node_id, channels_hint) {
+                Some(child) => child,
+                None => return,
             };
-            let mut peak = MeterLevels {
-                left: 0.0,
-                right: 0.0,
+
+            let Some(stdout) = child.stdout.take() else {
+                let _ = child.kill();
+                let _ = child.wait();
+                return;
             };
-            let mut peak_expiry = Instant::now();
+
+            let mut reader = BufReader::new(stdout);
+            let mut smoothed = MeterLevels::default();
+            let mut peak = MeterLevels::default();
+            let mut buffer = vec![0_u8; sample_frame_size.max(256)];
 
             while !stop_flag.load(Ordering::Relaxed) {
-                if let Some((left, right)) = sample_source_levels(node_id, channels_hint) {
-                    let mut new_peak = false;
+                let bytes_read = match reader.read(&mut buffer) {
+                    Ok(0) => break,
+                    Ok(count) => count,
+                    Err(_) => break,
+                };
 
-                    smoothed.left = smooth_level(smoothed.left, left);
-                    smoothed.right = smooth_level(smoothed.right, right);
+                let (left, right) = decode_levels(&buffer[..bytes_read], channels_hint);
+                smoothed.left = smooth_level(smoothed.left, left);
+                smoothed.right = smooth_level(smoothed.right, right);
+                peak.left = peak.left.max(smoothed.left);
+                peak.right = peak.right.max(smoothed.right);
 
-                    if smoothed.left >= peak.left {
-                        peak.left = smoothed.left;
-                        new_peak = true;
-                    }
-                    if smoothed.right >= peak.right {
-                        peak.right = smoothed.right;
-                        new_peak = true;
-                    }
-
-                    if new_peak {
-                        peak_expiry = Instant::now() + Self::PEAK_HOLD;
-                    }
-
-                    if let Ok(mut state) = readings.lock() {
-                        state.insert(
-                            node_id,
-                            MeterSnapshot {
-                                current: smoothed,
-                                peak,
-                            },
-                        );
-                    }
+                if let Ok(mut state) = readings.lock() {
+                    state.insert(
+                        node_id,
+                        MeterSnapshot {
+                            current: smoothed,
+                            peak,
+                        },
+                    );
                 }
-
-                if Instant::now() >= peak_expiry {
-                    peak.left = smoothed.left;
-                    peak.right = smoothed.right;
-                }
-
-                thread::sleep(Self::POLL_INTERVAL);
             }
+
+            let _ = child.kill();
+            let _ = child.wait();
         });
 
         self.workers.insert(node.id, MeterWorker { stop, handle });
@@ -153,11 +144,54 @@ impl LiveMeterStore {
     }
 }
 
+fn spawn_meter_process(node_id: u32, channels: u8) -> Option<Child> {
+    Command::new("pw-cat")
+        .args([
+            "--record",
+            "--raw",
+            "--target",
+            &node_id.to_string(),
+            "--format",
+            "s16",
+            "--channels",
+            &channels.to_string(),
+            "-",
+        ])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .ok()
+}
+
+fn decode_levels(buffer: &[u8], channels: u8) -> (f32, f32) {
+    let stride = usize::from(channels).max(1) * 2;
+    let mut left_peak = 0.0_f32;
+    let mut right_peak = 0.0_f32;
+
+    for frame in buffer.chunks_exact(stride) {
+        let left = i16::from_le_bytes([frame[0], frame[1]]) as f32 / i16::MAX as f32;
+        left_peak = left_peak.max(left.abs());
+
+        if channels > 1 {
+            let right = i16::from_le_bytes([frame[2], frame[3]]) as f32 / i16::MAX as f32;
+            right_peak = right_peak.max(right.abs());
+        }
+    }
+
+    if channels == 1 {
+        right_peak = left_peak;
+    }
+
+    (left_peak.clamp(0.0, 1.0), right_peak.clamp(0.0, 1.0))
+}
+
 fn smooth_level(previous: f32, input: f32) -> f32 {
-    if input > previous {
-        previous + (input - previous) * LiveMeterStore::ATTACK
+    let delta = input - previous;
+
+    if delta > 0.0 {
+        previous + delta * 0.28
     } else {
-        previous + (input - previous) * LiveMeterStore::RELEASE
+        previous + delta * 0.08
     }
 }
 
