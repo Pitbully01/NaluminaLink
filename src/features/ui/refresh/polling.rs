@@ -11,6 +11,7 @@ impl NaluminaApp {
         debug!("refresh: success with {} nodes", nodes.len());
         self.status.set_loaded_nodes(&self.i18n, nodes.len());
         self.nodes = nodes;
+        self.apply_default_devices();
         self.sync_input_channel_defaults();
         self.sync_live_meter_sources();
     }

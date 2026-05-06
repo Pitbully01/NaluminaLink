@@ -7,7 +7,7 @@ pub const MAX_VISIBLE_CHANNELS: usize = 10;
 pub const DEFAULT_MIX_BUS_COUNT: usize = 2;
 pub const MAX_MIX_BUS_COUNT: usize = 8;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct ChannelStripState {
     pub level: f32,
     pub muted: bool,
@@ -70,11 +70,25 @@ impl ChannelStateStore {
         &mut self,
         node_id: u32,
         defaults: ChannelStripState,
-    ) {
-        self.channels
-            .entry(node_id)
-            .and_modify(|state| *state = state.normalized_with(&defaults))
-            .or_insert(defaults);
+    ) -> bool {
+        use std::collections::btree_map::Entry;
+
+        match self.channels.entry(node_id) {
+            Entry::Vacant(entry) => {
+                entry.insert(defaults);
+                true
+            }
+            Entry::Occupied(mut entry) => {
+                let normalized = entry.get().normalized_with(&defaults);
+                let changed = normalized != *entry.get();
+
+                if changed {
+                    entry.insert(normalized);
+                }
+
+                changed
+            }
+        }
     }
 
     pub(in crate::features::ui) fn load_or_default(

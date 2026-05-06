@@ -1,6 +1,7 @@
 use std::sync::mpsc::Receiver;
 
 use eframe::egui;
+use log::debug;
 
 use crate::features::node_discovery::NodeEntry;
 use crate::shared::i18n::I18n;
@@ -51,6 +52,8 @@ pub struct NaluminaApp {
     visible_channel_limit: usize,
     mix_bus_count: usize,
     mix_bus_names: Vec<String>,
+    frame_count: u64,
+    last_update_at: Option<std::time::Instant>,
 }
 
 impl NaluminaApp {
@@ -102,6 +105,8 @@ impl NaluminaApp {
             visible_channel_limit: MAX_VISIBLE_CHANNELS,
             mix_bus_count,
             mix_bus_names,
+            frame_count: 0,
+            last_update_at: None,
         };
 
         app.start_refresh();
@@ -120,6 +125,30 @@ impl NaluminaApp {
 
 impl eframe::App for NaluminaApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.frame_count = self.frame_count.saturating_add(1);
+        let now = std::time::Instant::now();
+        let frame_delta_ms = self
+            .last_update_at
+            .map(|previous| now.duration_since(previous).as_millis())
+            .unwrap_or(0);
+        self.last_update_at = Some(now);
+
+        debug!(
+            "ui:update frame={} dt_ms={} nodes={} input_channels={} refresh_inflight={}",
+            self.frame_count,
+            frame_delta_ms,
+            self.nodes.len(),
+            self.input_channels.len(),
+            self.refresh_inflight.is_some()
+        );
+        // Log input events (window/focus/resize) forwarded to egui for debugging compositor interactions
+        ctx.input(|input| {
+            if !input.events.is_empty() {
+                for ev in &input.events {
+                    debug!("ui:input event: {:?}", ev);
+                }
+            }
+        });
         Self::apply_theme(ctx);
         self.poll_refresh();
 
@@ -127,6 +156,17 @@ impl eframe::App for NaluminaApp {
         self.render_status_bar(ctx);
         self.render_main_panel(ctx);
 
-        ctx.request_repaint_after(std::time::Duration::from_millis(16));
+        // Throttle repainting when there are no live meter sources to reduce compositor load
+        let repaint_ms = if self
+            .input_channels
+            .iter()
+            .any(|ch| ch.source_node_id.is_some())
+        {
+            16
+        } else {
+            250
+        };
+
+        ctx.request_repaint_after(std::time::Duration::from_millis(repaint_ms));
     }
 }

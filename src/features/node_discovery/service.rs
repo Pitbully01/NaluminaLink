@@ -149,6 +149,18 @@ fn normalize_gain_hint(value: f32) -> f32 {
     }
 }
 
+fn parse_media_class(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<String> {
+    props
+        .and_then(|properties| properties.get("media.class"))
+        .map(|s| s.to_string())
+}
+
+fn parse_device_class(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<String> {
+    props
+        .and_then(|properties| properties.get("device.class"))
+        .map(|s| s.to_string())
+}
+
 pub fn sample_source_levels(node_id: u32, channels_hint: Option<u8>) -> Option<(f32, f32)> {
     let channels = channels_hint.unwrap_or(2).clamp(1, 2);
     let sample_count = u32::from(channels) * 128;
@@ -332,6 +344,14 @@ pub fn collect_nodes_for_sources(
                         )
                     });
 
+                let media_class = parse_media_class(props);
+                let device_class = parse_device_class(props);
+
+                debug!(
+                    "node_discovery: parsed node id={} name={} media_class={:?} device_class={:?}",
+                    global.id, node_name, media_class, device_class
+                );
+
                 nodes_for_global.borrow_mut().push(NodeEntry {
                     id: global.id,
                     name: node_name.to_string(),
@@ -340,6 +360,8 @@ pub fn collect_nodes_for_sources(
                     channels_hint,
                     peak_left_hint,
                     peak_right_hint,
+                    media_class,
+                    device_class,
                 });
             })
             .global_remove(|_global_id| {})
@@ -385,6 +407,135 @@ pub fn collect_nodes_for_sources(
     debug!("node_discovery: collected {} nodes", nodes.len());
 
     Ok(nodes)
+}
+
+/// Finds the first microphone node (Audio/Source with Microphone device class)
+pub fn find_default_microphone(nodes: &[NodeEntry]) -> Option<u32> {
+    // First try to find by device class (if available)
+    let mic_by_class = nodes.iter().find(|node| {
+        let is_source = node
+            .media_class
+            .as_ref()
+            .map(|c| c.contains("Audio/Source"))
+            .unwrap_or(false);
+        let is_microphone = node
+            .device_class
+            .as_ref()
+            .map(|c| c.contains("Microphone"))
+            .unwrap_or(false);
+        is_source && is_microphone
+    });
+
+    if let Some(node) = mic_by_class {
+        debug!(
+            "node_discovery: found microphone by class: {} ({})",
+            node.id, node.name
+        );
+        return Some(node.id);
+    }
+
+    // Prefer USB devices (real hardware) over virtual devices
+    let usb_source = nodes.iter().find(|node| {
+        let is_source = node
+            .media_class
+            .as_ref()
+            .map(|c| c.contains("Audio/Source"))
+            .unwrap_or(false);
+        let name_lower = node.name.to_lowercase();
+        // USB devices are real hardware, "usb" in name is a good indicator
+        let is_usb_device = name_lower.contains("usb-");
+        is_source && is_usb_device
+    });
+
+    if let Some(node) = usb_source {
+        debug!(
+            "node_discovery: found USB microphone: {} ({})",
+            node.id, node.name
+        );
+        return Some(node.id);
+    }
+
+    // Fallback: look for any Audio/Source with typical microphone-like names (but not virtual)
+    let mic_by_name = nodes.iter().find(|node| {
+        let is_source = node
+            .media_class
+            .as_ref()
+            .map(|c| c.contains("Audio/Source"))
+            .unwrap_or(false);
+        let name_lower = node.name.to_lowercase();
+        let desc_lower = node.description.to_lowercase();
+
+        // Exclude virtual/dummy devices
+        let is_not_virtual = !name_lower.contains("virtual")
+            && !name_lower.contains("dummy")
+            && !name_lower.contains("monitor")
+            && !name_lower.contains("loopback");
+
+        let is_mic_like = name_lower.contains("mic")
+            || name_lower.contains("input")
+            || desc_lower.contains("microphone")
+            || desc_lower.contains("recording");
+
+        is_source && is_mic_like && is_not_virtual
+    });
+
+    if let Some(node) = mic_by_name {
+        debug!(
+            "node_discovery: found microphone by name heuristic: {} ({})",
+            node.id, node.name
+        );
+        return Some(node.id);
+    }
+
+    // Last resort: any non-virtual Audio/Source
+    let any_non_virtual_source = nodes.iter().find(|node| {
+        let is_source = node
+            .media_class
+            .as_ref()
+            .map(|c| c.contains("Audio/Source"))
+            .unwrap_or(false);
+        let name_lower = node.name.to_lowercase();
+        let is_not_virtual = !name_lower.contains("virtual")
+            && !name_lower.contains("dummy")
+            && !name_lower.contains("monitor")
+            && !name_lower.contains("loopback");
+        is_source && is_not_virtual
+    });
+
+    if let Some(node) = any_non_virtual_source {
+        debug!(
+            "node_discovery: using non-virtual Audio/Source as microphone: {} ({})",
+            node.id, node.name
+        );
+        return Some(node.id);
+    }
+
+    debug!(
+        "node_discovery: no suitable microphone found among {} nodes",
+        nodes.len()
+    );
+    None
+}
+
+/// Finds the first headphone node (Audio/Sink with Headphone device class)
+#[allow(dead_code)]
+pub fn find_default_headphones(nodes: &[NodeEntry]) -> Option<u32> {
+    nodes
+        .iter()
+        .find(|node| {
+            let is_sink = node
+                .media_class
+                .as_ref()
+                .map(|c| c.contains("Audio/Sink"))
+                .unwrap_or(false);
+            let is_headphones = node
+                .device_class
+                .as_ref()
+                .map(|c| c.contains("Headphones") || c.contains("Headphone"))
+                .unwrap_or(false);
+            is_sink && is_headphones
+        })
+        .map(|node| node.id)
 }
 
 pub fn render_nodes(i18n: &I18n, nodes: &[NodeEntry]) {

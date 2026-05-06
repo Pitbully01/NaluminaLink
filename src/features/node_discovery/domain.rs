@@ -7,4 +7,6 @@ pub struct NodeEntry {
     pub channels_hint: Option<u8>,
     pub peak_left_hint: Option<f32>,
     pub peak_right_hint: Option<f32>,
+    pub media_class: Option<String>,
+    pub device_class: Option<String>,
 }

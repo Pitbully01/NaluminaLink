@@ -1,7 +1,9 @@
 use super::super::NaluminaApp;
+use crate::features::node_discovery::find_default_microphone;
 use crate::features::ui::state::{
     ChannelStripState, DEFAULT_CHANNEL_LEVEL, DEFAULT_MONITOR_SEND, DEFAULT_STREAM_SEND,
 };
+use log::debug;
 
 impl NaluminaApp {
     fn clamped_level(level: Option<f32>) -> f32 {
@@ -56,7 +58,12 @@ impl NaluminaApp {
     ) {
         let volume_hint = self.source_volume_hint(source_node_id);
         let state = Self::default_channel_state(self.mix_bus_count, volume_hint);
-        self.channel_state.ensure_defaults(channel_id, state);
+        let changed = self.channel_state.ensure_defaults(channel_id, state);
+
+        debug!(
+            "ensure_input_channel_defaults: channel_id={} source_node_id={:?} changed={}",
+            channel_id, source_node_id, changed
+        );
     }
 
     pub(in crate::features::ui) fn sync_input_channel_defaults(&mut self) {
@@ -66,8 +73,53 @@ impl NaluminaApp {
             .map(|channel| (channel.id, channel.source_node_id))
             .collect();
 
+        debug!(
+            "sync_input_channel_defaults: channels={} nodes={} mix_bus_count={}",
+            channels.len(),
+            self.nodes.len(),
+            self.mix_bus_count
+        );
+
         for (channel_id, source_node_id) in channels {
+            debug!(
+                "sync_input_channel_defaults: channel_id={} source_node_id={:?}",
+                channel_id, source_node_id
+            );
             self.ensure_input_channel_defaults(channel_id, source_node_id);
+        }
+    }
+
+    pub(in crate::features::ui) fn apply_default_devices(&mut self) {
+        debug!(
+            "apply_default_devices: checking {} input channels",
+            self.input_channels.len()
+        );
+
+        debug!(
+            "apply_default_devices: nodes available = {:?}",
+            self.nodes
+                .iter()
+                .map(|node| (&node.id, &node.name, &node.media_class, &node.device_class))
+                .collect::<Vec<_>>()
+        );
+
+        if let Some(mic_id) = find_default_microphone(&self.nodes) {
+            debug!("apply_default_devices: found microphone with id {}", mic_id);
+            if let Some(channel) = self
+                .input_channels
+                .iter_mut()
+                .find(|ch| ch.source_node_id.is_none())
+            {
+                debug!(
+                    "apply_default_devices: assigning microphone {} to channel {}",
+                    mic_id, channel.id
+                );
+                channel.source_node_id = Some(mic_id);
+            } else {
+                debug!("apply_default_devices: no unassigned channels found");
+            }
+        } else {
+            debug!("apply_default_devices: no microphone found");
         }
     }
 }
