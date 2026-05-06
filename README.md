@@ -37,7 +37,7 @@ Current focus: Redesigning the matrix mixer from vertical cards to a table-like 
 ### Steps 1-7 (Current Phase):
 
 1. **✅ DONE** — FX-Buttons per input channel
-2. **✅ DONE** — + Buttons for new input channels  
+2. **✅ DONE** — + Buttons for new input channels
 3. **✅ DONE** — + Buttons for new output/mix channels
 4. **TODO** — Bridge/Link icons between cells with level faders
 5. **TODO** — Virtual PipeWire input devices per mix-bus
@@ -45,6 +45,7 @@ Current focus: Redesigning the matrix mixer from vertical cards to a table-like 
 7. **TODO** — Polish (hover states, animations, drag-drop)
 
 #### Completed Groundwork:
+
 - ✓ Persistent audio stream capture (no taskbar flicker)
 - ✓ Microphone prioritization heuristics (Wave XLR > USB > fallback)
 - ✓ Grid layout with horizontal row structure

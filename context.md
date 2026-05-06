@@ -136,6 +136,7 @@ Input → Gain → EQ → Reverb → Output
 ## Current Implementation Status
 
 ### Completed:
+
 - ✓ Persistent audio streams (live metering via `pw-cat --record`)
 - ✓ Microphone auto-selection with heuristics (prioritizes Wave XLR, excludes headsets)
 - ✓ 3×n Grid matrix layout (input rows × output columns + bridge icons)
@@ -145,6 +146,7 @@ Input → Gain → EQ → Reverb → Output
 - ✓ i18n support (English, Deutsch)
 
 ### In Progress (Steps 1-7):
+
 1. ✅ FX-Buttons per input channel — **DONE** (May 6)
 2. ✅ + Buttons for new input channels — **DONE** (May 6)
 3. ✅ + Buttons for new output/mix channels — **DONE** (May 6)
@@ -154,6 +156,7 @@ Input → Gain → EQ → Reverb → Output
 7. TODO — UI Polish (hover, animations, drag-drop)
 
 ### Technology Stack:
+
 - **Audio:** PipeWire (pw-cat for streams), pipewire-rs crate
 - **UI:** egui 0.28.1 via eframe
 - **Concurrency:** Rust threads, Arc<AtomicBool> for stop signals

@@ -133,8 +133,10 @@ fn render_matrix_bus_header(ui: &mut egui::Ui, text: &str) {
             ui.vertical_centered(|ui| {
                 ui.label(egui::RichText::new(text).size(12.0).strong());
                 ui.add_space(4.0);
-                let (rect, _) = ui.allocate_exact_size(egui::vec2(104.0, 2.0), egui::Sense::hover());
-                ui.painter().rect_filled(rect, 1.0, egui::Color32::from_rgb(77, 208, 122));
+                let (rect, _) =
+                    ui.allocate_exact_size(egui::vec2(104.0, 2.0), egui::Sense::hover());
+                ui.painter()
+                    .rect_filled(rect, 1.0, egui::Color32::from_rgb(77, 208, 122));
             });
         });
 }
@@ -258,8 +260,15 @@ pub(in crate::features::ui) fn render_mix_matrix(
 
                         // Add new mix bus button (if under limit)
                         if app.mix_bus_count < crate::features::ui::state::MAX_MIX_BUS_COUNT {
-                            if ui.button(egui::RichText::new("+").size(14.0).strong()).clicked() {
-                                app.mix_bus_count = (app.mix_bus_count + 1).min(crate::features::ui::state::MAX_MIX_BUS_COUNT);
+                            if ui
+                                .button(egui::RichText::new("+ Ausgang")
+                                    .size(11.0)
+                                    .strong()
+                                    .color(egui::Color32::from_rgb(77, 208, 122)))
+                                .clicked()
+                            {
+                                app.mix_bus_count = (app.mix_bus_count + 1)
+                                    .min(crate::features::ui::state::MAX_MIX_BUS_COUNT);
                                 app.sync_mix_bus_names();
                             }
                         }
@@ -288,24 +297,59 @@ pub(in crate::features::ui) fn render_mix_matrix(
                                 .rounding(egui::Rounding::same(6.0))
                                 .inner_margin(egui::Margin::symmetric(10.0, 8.0))
                                 .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(MATRIX_ROW_LABEL_WIDTH, MATRIX_ROW_HEIGHT));
+                                    ui.set_min_size(egui::vec2(
+                                        MATRIX_ROW_LABEL_WIDTH,
+                                        MATRIX_ROW_HEIGHT,
+                                    ));
                                     ui.horizontal(|ui| {
                                         let avatar = avatar_label(&channel.name);
                                         render_avatar(ui, &avatar);
                                         ui.add_space(8.0);
 
                                         ui.vertical(|ui| {
-                                            ui.label(egui::RichText::new(&channel.name).size(12.0).strong());
-                                            render_source_picker(app, ui, channel.id, &source_label, node_choices);
+                                            ui.label(
+                                                egui::RichText::new(&channel.name)
+                                                    .size(12.0)
+                                                    .strong(),
+                                            );
+                                            render_source_picker(
+                                                app,
+                                                ui,
+                                                channel.id,
+                                                &source_label,
+                                                node_choices,
+                                            );
                                             ui.add_space(4.0);
-                                            let (live_left, live_right) = app.source_live_levels(source_node_id);
+                                            let (live_left, live_right) =
+                                                app.source_live_levels(source_node_id);
                                             render_lr_meter(ui, live_left, live_right);
                                         });
+
+                                        ui.add_space(12.0);
+
+                                        // Mute Button
+                                        let mute_color = if state.muted {
+                                            egui::Color32::from_rgb(255, 107, 107)
+                                        } else {
+                                            egui::Color32::from_rgb(110, 130, 160)
+                                        };
+                                        if ui.button(
+                                            egui::RichText::new("🔇")
+                                                .size(13.0)
+                                                .color(mute_color),
+                                        ).clicked() {
+                                            state.muted = !state.muted;
+                                        }
 
                                         ui.add_space(6.0);
 
                                         // FX Button
-                                        if ui.button(egui::RichText::new("FX").size(10.0)).clicked() {
+                                        if ui.button(
+                                            egui::RichText::new("FX")
+                                                .size(10.0)
+                                                .strong()
+                                                .color(egui::Color32::from_rgb(155, 170, 188)),
+                                        ).clicked() {
                                             // TODO: Open FX panel for this channel
                                         }
                                     });
@@ -318,15 +362,13 @@ pub(in crate::features::ui) fn render_mix_matrix(
                             ui.add_space(8.0);
 
                             for bus_index in 0..app.mix_bus_count {
-                                let mut send = state
-                                    .sends
-                                    .get(bus_index)
-                                    .copied()
-                                    .unwrap_or(if bus_index == 0 {
+                                let mut send = state.sends.get(bus_index).copied().unwrap_or(
+                                    if bus_index == 0 {
                                         crate::features::ui::state::DEFAULT_MONITOR_SEND
                                     } else {
                                         crate::features::ui::state::DEFAULT_STREAM_SEND
-                                    });
+                                    },
+                                );
 
                                 if render_matrix_send_cell(
                                     ui,
@@ -353,7 +395,13 @@ pub(in crate::features::ui) fn render_mix_matrix(
                     // Add new input channel button
                     ui.horizontal(|ui| {
                         ui.add_space(MATRIX_ROW_LABEL_WIDTH + 14.0);
-                        if ui.button(egui::RichText::new("+").size(14.0).strong()).clicked() {
+                        if ui
+                            .button(egui::RichText::new("+ Eingang")
+                                .size(11.0)
+                                .strong()
+                                .color(egui::Color32::from_rgb(77, 208, 122)))
+                            .clicked()
+                        {
                             app.add_input_channel();
                         }
                     });
