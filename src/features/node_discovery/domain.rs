@@ -9,4 +9,7 @@ pub struct NodeEntry {
     pub peak_right_hint: Option<f32>,
     pub media_class: Option<String>,
     pub device_class: Option<String>,
+    pub is_default_source: bool,
+    #[allow(dead_code)]
+    pub is_default_sink: bool,
 }

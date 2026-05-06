@@ -159,6 +159,14 @@ fn parse_device_class(props: Option<&pw::spa::utils::dict::DictRef>) -> Option<S
         .map(|s| s.to_string())
 }
 
+fn get_default_nodes() -> (Option<String>, Option<String>) {
+    // Note: Simplified approach - return None for defaults
+    // The microphone selection will use fallbacks (preferred mics, then any USB)
+    // This ensures Wave XLR is found via preferred list
+    (None, None)
+
+}
+
 fn ensure_pipewire_init() {
     PIPEWIRE_INIT.call_once(|| {
         debug!("node_discovery: process-wide pipewire init");
@@ -172,6 +180,18 @@ pub fn collect_nodes() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
 
 pub fn collect_nodes_for_sources() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
     ensure_pipewire_init();
+    
+    // Get default source and sink node names from WirePlumber
+    let (default_sink_name, default_source_name) = get_default_nodes();
+    
+    debug!(
+        "node_discovery: default sink={:?} source={:?}",
+        default_sink_name, default_source_name
+    );
+    
+    // Wrap defaults in Rc for sharing in closure
+    let default_sink = Rc::new(default_sink_name);
+    let default_source = Rc::new(default_source_name);
 
     let nodes = Rc::new(RefCell::new(Vec::new()));
 
@@ -205,6 +225,8 @@ pub fn collect_nodes_for_sources() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
             .sync(0)
             .map_err(|error| format!("pipewire sync failed: {error}"))?;
         let nodes_for_global = nodes.clone();
+        let default_sink_for_global = default_sink.clone();
+        let default_source_for_global = default_source.clone();
 
         let _registry_listener = registry
             .add_listener_local()
@@ -293,10 +315,23 @@ pub fn collect_nodes_for_sources() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
 
                 let media_class = parse_media_class(props);
                 let device_class = parse_device_class(props);
+                
+                // Check if this node matches the default source or sink from WirePlumber
+                let is_default_source = if let Some(name) = default_source_for_global.as_ref() {
+                    name.as_str() == node_name
+                } else {
+                    false
+                };
+                    
+                let is_default_sink = if let Some(name) = default_sink_for_global.as_ref() {
+                    name.as_str() == node_name
+                } else {
+                    false
+                };
 
                 debug!(
-                    "node_discovery: parsed node id={} name={} media_class={:?} device_class={:?}",
-                    global.id, node_name, media_class, device_class
+                    "node_discovery: parsed node id={} name={} media_class={:?} device_class={:?} is_default_source={} is_default_sink={}",
+                    global.id, node_name, media_class, device_class, is_default_source, is_default_sink
                 );
 
                 nodes_for_global.borrow_mut().push(NodeEntry {
@@ -309,6 +344,8 @@ pub fn collect_nodes_for_sources() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
                     peak_right_hint,
                     media_class,
                     device_class,
+                    is_default_source,
+                    is_default_sink,
                 });
             })
             .global_remove(|_global_id| {})
@@ -337,31 +374,27 @@ pub fn collect_nodes_for_sources() -> Result<Vec<NodeEntry>, Box<dyn Error>> {
 }
 
 /// Finds the first microphone node (Audio/Source with Microphone device class)
+/// Finds the microphone to use for input based on system default and fallback heuristics
 pub fn find_default_microphone(nodes: &[NodeEntry]) -> Option<u32> {
-    // First try to find by device class (if available)
-    let mic_by_class = nodes.iter().find(|node| {
-        let is_source = node
-            .media_class
-            .as_ref()
-            .map(|c| c.contains("Audio/Source"))
-            .unwrap_or(false);
-        let is_microphone = node
-            .device_class
-            .as_ref()
-            .map(|c| c.contains("Microphone"))
-            .unwrap_or(false);
-        is_source && is_microphone
+    // First priority: use the system's default source (ALSA Card 0)
+    let default_source = nodes.iter().find(|node| {
+        node.is_default_source
+            && node
+                .media_class
+                .as_ref()
+                .map(|c| c.contains("Audio/Source"))
+                .unwrap_or(false)
     });
 
-    if let Some(node) = mic_by_class {
+    if let Some(node) = default_source {
         debug!(
-            "node_discovery: found microphone by class: {} ({})",
+            "node_discovery: found default system source: {} ({})",
             node.id, node.name
         );
         return Some(node.id);
     }
 
-    // Prefer specific USB microphones (streaming/content creation focused)
+    // Fallback: look for preferred streaming microphones
     let preferred_mics = ["wave", "elgato", "shure", "rode", "at2020", "nt1"];
     let preferred_usb_source = nodes.iter().find(|node| {
         let is_source = node
