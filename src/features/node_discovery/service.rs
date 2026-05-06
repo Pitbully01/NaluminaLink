@@ -361,7 +361,31 @@ pub fn find_default_microphone(nodes: &[NodeEntry]) -> Option<u32> {
         return Some(node.id);
     }
 
-    // Prefer USB devices (real hardware) over virtual devices
+    // Prefer specific USB microphones (streaming/content creation focused)
+    let preferred_mics = ["wave", "elgato", "shure", "rode", "at2020", "nt1"];
+    let preferred_usb_source = nodes.iter().find(|node| {
+        let is_source = node
+            .media_class
+            .as_ref()
+            .map(|c| c.contains("Audio/Source"))
+            .unwrap_or(false);
+        let name_lower = node.name.to_lowercase();
+        let is_usb_device = name_lower.contains("usb-");
+        let is_preferred = preferred_mics
+            .iter()
+            .any(|&preferred| name_lower.contains(preferred));
+        is_source && is_usb_device && is_preferred
+    });
+
+    if let Some(node) = preferred_usb_source {
+        debug!(
+            "node_discovery: found preferred USB microphone: {} ({})",
+            node.id, node.name
+        );
+        return Some(node.id);
+    }
+
+    // Fallback: any USB source, but exclude common headset mics
     let usb_source = nodes.iter().find(|node| {
         let is_source = node
             .media_class
@@ -369,9 +393,13 @@ pub fn find_default_microphone(nodes: &[NodeEntry]) -> Option<u32> {
             .map(|c| c.contains("Audio/Source"))
             .unwrap_or(false);
         let name_lower = node.name.to_lowercase();
-        // USB devices are real hardware, "usb" in name is a good indicator
         let is_usb_device = name_lower.contains("usb-");
-        is_source && is_usb_device
+        // Exclude headset mics unless no other option
+        let is_not_headset = !name_lower.contains("kraken")
+            && !name_lower.contains("steelseries")
+            && !name_lower.contains("corsair")
+            && !name_lower.contains("hyperx");
+        is_source && is_usb_device && is_not_headset
     });
 
     if let Some(node) = usb_source {
