@@ -1,7 +1,7 @@
 use eframe::egui;
 
-use super::super::state::{ChannelStripState, MixLevels};
-use super::super::{InputChannel, NaluminaApp};
+use super::super::state::MixLevels;
+use super::super::NaluminaApp;
 use super::widgets::{
     db_to_gain, format_db, gain_to_db, meter_zone_color, render_avatar, render_compact_fader,
     render_lr_meter,
@@ -14,6 +14,10 @@ const CARD_INNER_MARGIN_Y: f32 = 1.0;
 const CARD_OUTER_INNER_WIDTH: f32 = 356.0;
 const CARD_OUTER_INNER_HEIGHT: f32 = 66.0;
 const CHANNEL_NAME_WIDTH: usize = 28;
+const MATRIX_ROW_LABEL_WIDTH: f32 = 260.0;
+const MATRIX_BUS_COL_WIDTH: f32 = 172.0;
+const MATRIX_BUS_HEADER_HEIGHT: f32 = 54.0;
+const MATRIX_ROW_HEIGHT: f32 = 66.0;
 
 #[derive(Clone)]
 pub(crate) struct NodeChoice {
@@ -40,14 +44,6 @@ fn channel_card_frame(fill: egui::Color32, stroke: egui::Color32) -> egui::Frame
         ))
 }
 
-fn default_card_fill() -> egui::Color32 {
-    egui::Color32::from_rgb(28, 35, 44)
-}
-
-fn default_card_stroke() -> egui::Color32 {
-    egui::Color32::from_rgb(66, 82, 103)
-}
-
 fn output_card_fill() -> egui::Color32 {
     egui::Color32::from_rgb(20, 26, 38)
 }
@@ -60,7 +56,10 @@ fn truncate_label(s: &str, max_len: usize) -> String {
     if s.len() <= max_len {
         s.to_string()
     } else {
-        let mut out = s.chars().take(max_len.saturating_sub(1)).collect::<String>();
+        let mut out = s
+            .chars()
+            .take(max_len.saturating_sub(1))
+            .collect::<String>();
         out.push('…');
         out
     }
@@ -123,123 +122,61 @@ fn set_channel_source(app: &mut NaluminaApp, channel_id: u32, source_node_id: Op
     }
 }
 
-fn render_channel_labels(
-    app: &mut NaluminaApp,
-    ui: &mut egui::Ui,
-    channel_id: u32,
-    channel_name: &str,
-    source_label: &str,
-    node_choices: &[NodeChoice],
-) {
-    ui.label(egui::RichText::new(channel_name).size(12.0).strong());
-    render_source_picker(app, ui, channel_id, source_label, node_choices);
+fn render_matrix_bus_header(ui: &mut egui::Ui, text: &str) {
+    egui::Frame::none()
+        .fill(egui::Color32::from_rgb(29, 36, 46))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 72, 94)))
+        .rounding(egui::Rounding::same(6.0))
+        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+        .show(ui, |ui| {
+            ui.set_min_size(egui::vec2(MATRIX_BUS_COL_WIDTH, MATRIX_BUS_HEADER_HEIGHT));
+            ui.vertical_centered(|ui| {
+                ui.label(egui::RichText::new(text).size(12.0).strong());
+                ui.add_space(4.0);
+                let (rect, _) = ui.allocate_exact_size(egui::vec2(104.0, 2.0), egui::Sense::hover());
+                ui.painter().rect_filled(rect, 1.0, egui::Color32::from_rgb(77, 208, 122));
+            });
+        });
 }
 
-fn render_channel_controls(
+fn render_matrix_send_cell(
     ui: &mut egui::Ui,
-    state: &mut ChannelStripState,
+    bus_name: &str,
+    value: &mut f32,
     live_level: f32,
     peak_level: f32,
 ) -> bool {
     let mut changed = false;
 
-    let mute_button = egui::Button::new(if state.muted { "🔇" } else { "🔊" })
-        .min_size(egui::vec2(28.0, 20.0))
-        .fill(if state.muted {
-            egui::Color32::from_rgb(166, 44, 44)
-        } else {
-            egui::Color32::from_rgb(58, 67, 82)
+    egui::Frame::none()
+        .fill(egui::Color32::from_rgb(27, 34, 43))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 72, 94)))
+        .rounding(egui::Rounding::same(6.0))
+        .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+        .show(ui, |ui| {
+            ui.set_min_width(MATRIX_BUS_COL_WIDTH);
+            ui.vertical(|ui| {
+                ui.label(
+                    egui::RichText::new("🔊")
+                        .size(13.0)
+                        .color(egui::Color32::from_rgb(216, 224, 235)),
+                );
+                ui.label(
+                    egui::RichText::new(bus_name)
+                        .size(9.5)
+                        .color(egui::Color32::from_rgb(155, 170, 188)),
+                );
+                ui.add_space(4.0);
+
+                let mut send_db = gain_to_db(*value);
+                if render_compact_fader(ui, &mut send_db, live_level, peak_level, 136.0) {
+                    *value = db_to_gain(send_db);
+                    changed = true;
+                }
+            });
         });
 
-    if ui.add(mute_button).clicked() {
-        state.muted = !state.muted;
-        changed = true;
-    }
-
-    ui.add_space(6.0);
-
-    let mut level_db = gain_to_db(state.level);
-    if render_compact_fader(ui, &mut level_db, live_level, peak_level, 132.0) {
-        state.level = db_to_gain(level_db);
-        changed = true;
-    }
-
-    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-        let fx_button = egui::Button::new("FX")
-            .min_size(egui::vec2(26.0, 16.0))
-            .fill(egui::Color32::from_rgb(58, 67, 82));
-        if ui.add(fx_button).clicked() {
-            // placeholder for future filter panel
-        }
-    });
-
     changed
-}
-
-fn render_channel_card(
-    app: &mut NaluminaApp,
-    ui: &mut egui::Ui,
-    channel: &InputChannel,
-    node_choices: &[NodeChoice],
-) {
-    let source_node_id = channel.source_node_id;
-    let source_label = app.source_label(source_node_id);
-    let live_level = app.source_live_level(source_node_id);
-    let peak_level = app.source_peak_level(source_node_id);
-
-    let mut state = app.channel_state.load_or_default(
-        channel.id,
-        NaluminaApp::default_channel_state(
-            app.mix_bus_count,
-            app.source_volume_hint(source_node_id),
-        ),
-    );
-
-    let mut changed = false;
-
-    ui.allocate_ui_with_layout(
-        channel_card_size(),
-        egui::Layout::top_down(egui::Align::Min),
-        |ui| {
-            ui.set_min_size(channel_card_size());
-            ui.set_max_size(channel_card_size());
-
-            channel_card_frame(default_card_fill(), default_card_stroke()).show(ui, |ui| {
-                ui.set_min_size(channel_card_inner_size());
-                ui.set_max_size(channel_card_inner_size());
-
-                ui.with_layout(egui::Layout::left_to_right(egui::Align::Center), |ui| {
-                    let avatar = avatar_label(&channel.name);
-                    render_avatar(ui, &avatar);
-                    ui.add_space(6.0);
-
-                    ui.vertical(|ui| {
-                        render_channel_labels(
-                            app,
-                            ui,
-                            channel.id,
-                            &channel.name,
-                            &source_label,
-                            node_choices,
-                        );
-                        ui.add_space(4.0);
-                        let (live_left, live_right) = app.source_live_levels(source_node_id);
-                        render_lr_meter(ui, live_left, live_right);
-                    });
-
-                    ui.add_space(6.0);
-
-                    if render_channel_controls(ui, &mut state, live_level, peak_level) {
-                        changed = true;
-                    }
-                });
-            });
-        },
-    );
-
-    if changed {
-        app.channel_state.store(channel.id, state);
-    }
 }
 
 fn render_output_card(app: &NaluminaApp, ui: &mut egui::Ui, bus_index: usize, level: f32) {
@@ -302,14 +239,125 @@ pub(in crate::features::ui) fn render_mix_matrix(
         return;
     }
 
-    egui::ScrollArea::vertical()
-        .id_source("mix_matrix")
-        .max_height(480.0)
+    egui::Frame::none()
+        .fill(egui::Color32::from_rgb(16, 22, 32))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(44, 58, 79)))
+        .rounding(egui::Rounding::same(8.0))
+        .inner_margin(egui::Margin::symmetric(8.0, 8.0))
         .show(ui, |ui| {
-            for channel in &visible_channels {
-                render_channel_card(app, ui, channel, node_choices);
-                ui.add_space(6.0);
-            }
+            egui::ScrollArea::both()
+                .id_source("mix_matrix")
+                .max_height(540.0)
+                .show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.add_space(MATRIX_ROW_LABEL_WIDTH + 14.0);
+                        for bus_index in 0..app.mix_bus_count {
+                            render_matrix_bus_header(ui, &app.mix_bus_label(bus_index));
+                            ui.add_space(8.0);
+                        }
+
+                        // Add new mix bus button (if under limit)
+                        if app.mix_bus_count < crate::features::ui::state::MAX_MIX_BUS_COUNT {
+                            if ui.button(egui::RichText::new("+").size(14.0).strong()).clicked() {
+                                app.mix_bus_count = (app.mix_bus_count + 1).min(crate::features::ui::state::MAX_MIX_BUS_COUNT);
+                                app.sync_mix_bus_names();
+                            }
+                        }
+                    });
+
+                    ui.add_space(8.0);
+
+                    for channel in &visible_channels {
+                        ui.horizontal(|ui| {
+                            let source_node_id = channel.source_node_id;
+                            let source_label = app.source_label(source_node_id);
+                            let live_level = app.source_live_level(source_node_id);
+                            let peak_level = app.source_peak_level(source_node_id);
+
+                            let mut state = app.channel_state.load_or_default(
+                                channel.id,
+                                NaluminaApp::default_channel_state(
+                                    app.mix_bus_count,
+                                    app.source_volume_hint(source_node_id),
+                                ),
+                            );
+
+                            egui::Frame::none()
+                                .fill(egui::Color32::from_rgb(24, 31, 40))
+                                .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 76, 96)))
+                                .rounding(egui::Rounding::same(6.0))
+                                .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+                                .show(ui, |ui| {
+                                    ui.set_min_size(egui::vec2(MATRIX_ROW_LABEL_WIDTH, MATRIX_ROW_HEIGHT));
+                                    ui.horizontal(|ui| {
+                                        let avatar = avatar_label(&channel.name);
+                                        render_avatar(ui, &avatar);
+                                        ui.add_space(8.0);
+
+                                        ui.vertical(|ui| {
+                                            ui.label(egui::RichText::new(&channel.name).size(12.0).strong());
+                                            render_source_picker(app, ui, channel.id, &source_label, node_choices);
+                                            ui.add_space(4.0);
+                                            let (live_left, live_right) = app.source_live_levels(source_node_id);
+                                            render_lr_meter(ui, live_left, live_right);
+                                        });
+
+                                        ui.add_space(6.0);
+
+                                        // FX Button
+                                        if ui.button(egui::RichText::new("FX").size(10.0)).clicked() {
+                                            // TODO: Open FX panel for this channel
+                                        }
+                                    });
+
+                                    if state.muted {
+                                        ui.add_space(2.0);
+                                    }
+                                });
+
+                            ui.add_space(8.0);
+
+                            for bus_index in 0..app.mix_bus_count {
+                                let mut send = state
+                                    .sends
+                                    .get(bus_index)
+                                    .copied()
+                                    .unwrap_or(if bus_index == 0 {
+                                        crate::features::ui::state::DEFAULT_MONITOR_SEND
+                                    } else {
+                                        crate::features::ui::state::DEFAULT_STREAM_SEND
+                                    });
+
+                                if render_matrix_send_cell(
+                                    ui,
+                                    &app.mix_bus_label(bus_index),
+                                    &mut send,
+                                    live_level,
+                                    peak_level,
+                                ) {
+                                    if bus_index >= state.sends.len() {
+                                        state.sends.resize(app.mix_bus_count, 0.0);
+                                    }
+                                    state.sends[bus_index] = send;
+                                }
+
+                                ui.add_space(8.0);
+                            }
+
+                            app.channel_state.store(channel.id, state);
+                        });
+
+                        ui.add_space(8.0);
+                    }
+
+                    // Add new input channel button
+                    ui.horizontal(|ui| {
+                        ui.add_space(MATRIX_ROW_LABEL_WIDTH + 14.0);
+                        if ui.button(egui::RichText::new("+").size(14.0).strong()).clicked() {
+                            app.add_input_channel();
+                        }
+                    });
+                });
         });
 }
 

@@ -9,7 +9,7 @@ use crate::features::ui::state::{MixLevels, MAX_MIX_BUS_COUNT};
 const MAX_VISIBLE_CHANNEL_LIMIT: u32 = 24;
 
 impl NaluminaApp {
-    fn sync_mix_bus_names(&mut self) {
+    pub(in crate::features::ui) fn sync_mix_bus_names(&mut self) {
         let target = self.mix_bus_count;
 
         if self.mix_bus_names.len() < target {
@@ -25,7 +25,7 @@ impl NaluminaApp {
         }
     }
 
-    fn add_input_channel(&mut self) {
+    pub(in crate::features::ui) fn add_input_channel(&mut self) {
         let id = self.next_input_channel_id;
         self.next_input_channel_id = self.next_input_channel_id.saturating_add(1);
 
