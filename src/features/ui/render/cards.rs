@@ -254,7 +254,7 @@ pub(in crate::features::ui) fn render_mix_matrix(
                     // HEADER ROW: Bus headers + add button
                     ui.horizontal(|ui| {
                         ui.add_space(MATRIX_ROW_LABEL_WIDTH);
-                        
+
                         for bus_index in 0..app.mix_bus_count {
                             render_matrix_bus_header(ui, &app.mix_bus_label(bus_index));
                             ui.add_space(8.0);
@@ -360,7 +360,9 @@ pub(in crate::features::ui) fn render_mix_matrix(
                                                     egui::RichText::new("FX")
                                                         .size(9.0)
                                                         .strong()
-                                                        .color(egui::Color32::from_rgb(155, 170, 188)),
+                                                        .color(egui::Color32::from_rgb(
+                                                            155, 170, 188,
+                                                        )),
                                                 )
                                                 .clicked()
                                             {
@@ -376,11 +378,17 @@ pub(in crate::features::ui) fn render_mix_matrix(
                             for bus_index in 0..app.mix_bus_count {
                                 egui::Frame::none()
                                     .fill(egui::Color32::from_rgb(27, 34, 43))
-                                    .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(55, 72, 94)))
+                                    .stroke(egui::Stroke::new(
+                                        1.0,
+                                        egui::Color32::from_rgb(55, 72, 94),
+                                    ))
                                     .rounding(egui::Rounding::same(6.0))
                                     .inner_margin(egui::Margin::symmetric(8.0, 8.0))
                                     .show(ui, |ui| {
-                                        ui.set_min_size(egui::vec2(MATRIX_BUS_COL_WIDTH, MATRIX_ROW_HEIGHT));
+                                        ui.set_min_size(egui::vec2(
+                                            MATRIX_BUS_COL_WIDTH,
+                                            MATRIX_ROW_HEIGHT,
+                                        ));
                                         ui.vertical_centered(|ui| {
                                             // Bridge/Link Icon
                                             if ui
@@ -388,7 +396,9 @@ pub(in crate::features::ui) fn render_mix_matrix(
                                                     egui::RichText::new("+")
                                                         .size(20.0)
                                                         .strong()
-                                                        .color(egui::Color32::from_rgb(77, 208, 122)),
+                                                        .color(egui::Color32::from_rgb(
+                                                            77, 208, 122,
+                                                        )),
                                                 )
                                                 .clicked()
                                             {
@@ -430,7 +440,7 @@ pub(in crate::features::ui) fn render_mix_matrix(
 }
 
 pub(in crate::features::ui) fn render_mix_outputs(
-    app: &NaluminaApp,
+    app: &mut NaluminaApp,
     ui: &mut egui::Ui,
     mix_levels: &MixLevels,
 ) {
@@ -445,9 +455,28 @@ pub(in crate::features::ui) fn render_mix_outputs(
         .id_source("mix_outputs")
         .max_height(280.0)
         .show(ui, |ui| {
-            for (bus_index, level) in mix_levels.buses.iter().enumerate() {
-                render_output_card(app, ui, bus_index, *level);
+            for bus_index in 0..app.mix_bus_count {
+                let level = mix_levels.buses.get(bus_index).copied().unwrap_or(0.0);
+                render_output_card(app, ui, bus_index, level);
                 ui.add_space(6.0);
+            }
+
+            // Add new mix bus button
+            if app.mix_bus_count < crate::features::ui::state::MAX_MIX_BUS_COUNT {
+                ui.add_space(4.0);
+                if ui
+                    .button(
+                        egui::RichText::new("+ Ausgang")
+                            .size(12.0)
+                            .strong()
+                            .color(egui::Color32::from_rgb(77, 208, 122)),
+                    )
+                    .clicked()
+                {
+                    app.mix_bus_count =
+                        (app.mix_bus_count + 1).min(crate::features::ui::state::MAX_MIX_BUS_COUNT);
+                    app.sync_mix_bus_names();
+                }
             }
         });
 }
